@@ -873,3 +873,31 @@ footer .wrap { display: flex; flex-direction: column; align-items: flex-start; g
 .hero-dice { margin-top: 14px; margin-inline-end: 8px; color: var(--gold); border-color: var(--gold); background: rgba(255,207,86,.1); }
 .dice-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px dashed #d9cdb3; }
 .dice-row .dice-btn { flex: 1; justify-content: center; font-size: .82rem; padding: 7px 8px; }
+
+/* تفضيلات كل بند */
+.prefs .pref-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.prefs .pref-presets .chip-btn { font-size: .78rem; }
+.pref-row { display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 6px; font-size: .86rem; font-weight: 500; }
+.seg.mini { margin: 0; }
+.seg.mini span { padding: 4px 2px; font-size: .74rem; }
+.tier-badge.t-mix { background: #fffaf0; font-size: .7rem; }
+.book-links { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.book-links a { font-size: .8rem; font-weight: 600; text-decoration: none; padding: 2px 10px; border-radius: 999px; background: #12312f; color: #f6efe2; }
+.book-links a:last-child { background: #ff5a5f; color: #fff; }
+.leg-book { padding: 8px 16px; font-size: .82rem; color: #5d6f6c; border-bottom: 1px dashed #d9cdb3; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.facts-book { margin-top: 14px; font-size: .84rem; color: #5d6f6c; display: flex; flex-direction: column; gap: 6px; }
+
+/* اختيار الجواز */
+.pass-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; font-size: .85rem; }
+.pass-pick > span { font-weight: 600; color: var(--muted); }
+.pass-pick label { position: relative; }
+.pass-pick input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.pass-pick label span { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); font-size: .82rem; }
+.pass-pick input:checked + span { background: var(--gold); color: #12312f; border-color: var(--gold); font-weight: 600; }
+.pass-pick input:focus-visible + span { outline: 3px solid var(--gold); }
+.paper .pass-pick > span { color: #5d6f6c; }
+.paper .pass-pick label span { background: #ece1cc; border-color: #ece1cc; color: #12312f; }
+.visa-ye { background: #fff3d9; border-inline-start: 4px solid #e4572e; padding: 8px 12px; border-radius: 4px; font-size: .88rem; margin: 6px 0 4px; color: #12312f; }
+.visa-card { border: 2px solid #e4572e; }
+.visa-card p { margin: 6px 0 0; }
+.visa-mini { font-size: .72rem; color: #5d6f6c; margin: 6px 0 0; line-height: 1.5; }

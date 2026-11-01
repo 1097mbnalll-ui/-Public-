@@ -426,6 +426,7 @@
           <h1 class="display">${EN_ON ? `${esc(k.name)} <span class="gold">awaits</span>` : `${esc(k.name)} <span class="gold">بانتظارك</span>`}</h1>
           <p class="lead">${T(`${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.`, `${list.length} non-Arab countries. ${readyIn(cid).length} are fully covered, with more added all the time.`)}</p>
         </div>
+        ${passportPicker()}
         <form class="fit-form" id="fitForm" onsubmit="return false">
           <label>${T("ميزانيتي", "My budget")} <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ${T("ريال", "SAR")} <select id="fm" class="mode-sel">${modeSelect(st.budgetMode).replace(/^<select[^>]*>|<\/select>$/g, "")}</select></label>
           <label>${T("لمدة", "for")} <select id="fd">${[4, 5, 7, 10, 14].map((d) => `<option ${d === st.days ? "selected" : ""} value="${d}">${dayWord(d)}</option>`).join("")}</select></label>
@@ -459,7 +460,7 @@
       const prev = D;
       const rows = readyIn(cid).map((C) => {
         setCountry(C);
-        const s = { ...DEFAULT, ...s2, interests: [], budget: groupSAR * C.currency.perSAR };
+        const s = { ...DEFAULT, ...s2, prefs: store.get("budgetPlanSAR", {}).prefs, interests: [], budget: groupSAR * C.currency.perSAR };
         const { fits, over } = buildOptions(s);
         const best = fits[0] || over[0];
         return { C, fits: fits.length, best, total: best ? best.total / C.currency.perSAR : 0, ok: !!fits.length, route: best ? best.route.map((x) => x.short).join(` ${FWD} `) : "", tier: best ? best.tier : "" };
@@ -477,6 +478,7 @@
             <p class="pline">${r.ok ? `${optWord(r.fits)} · ${T("أفضلها", "best:")} ${esc(W.tiers[r.tier].name)}` : T(`ما تكفي ${dayWord(s2.days)}`, `Not enough for ${dayWord(s2.days)}`)}<br><small>${esc(r.route)}</small></p>
             <div class="meta"><span>${r.ok ? T("يبقى معك", "Left over") : T("ينقصك", "Short by")}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(groupSAR - r.total))}</b></div>
             <div class="meta pp"><span>${T("على الشخص", "Per person")}</span><b>${sar(r.total / s2.travelers)}</b></div>
+            <p class="visa-mini">🛂 ${esc(visaText(r.C)).slice(0, 90)}${visaText(r.C).length > 90 ? "…" : ""}</p>
           </a>`).join("")}</div>`;
     };
     form.addEventListener("input", update);
@@ -501,7 +503,9 @@
       lead: esc(D.tagline),
       body: `
         <div class="paper prep">
-          <div class="prep-h"><b class="display">${T("قبل لا تحجز", "Before you book")}</b><span>🛂 ${esc(D.visaNote)}</span></div>
+          <div class="prep-h"><b class="display">${T("قبل لا تحجز", "Before you book")}</b>${passport() === "sa" ? `<span>🛂 ${esc(D.visaNote)}</span>` : ""}</div>
+          ${passportPicker()}
+          ${passport() !== "sa" ? `<p class="visa-ye">🛂 ${esc(visaText(D))}</p>` : ""}
           <div class="facts3">
             <div>${T("العملة", "Currency")}<b>${T(`${esc(D.currency.name)} (${fmt(D.currency.perSAR, 2)} = ريال)`, `SAR 1 = ${fmt(D.currency.perSAR, 2)} ${esc(D.currency.name)}`)}</b></div>
             <div>${T("الطيران من السعودية", "Flights from Saudi")}<b>${T(`~${fmt(D.flightSAR)} ريال`, `~SAR ${fmt(D.flightSAR)}`)}</b></div>
@@ -558,6 +562,8 @@
 
     const tierRows = [
       [T("السكن (لليلة، غرفة لشخصين)", "Stay (per night, room for two)"), c.costs.hotel],
+      [T("شقة Airbnb كاملة (لليلة، تكفي 4) — تقدير", "Whole Airbnb flat (per night, sleeps 4) — est."), Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.apt[t])]))],
+      [T("غرفة خاصة في Airbnb (لليلة) — تقدير", "Private Airbnb room (per night) — est."), Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.room)]))],
       [T("الأكل (للشخص في اليوم)", "Food (per person per day)"), c.costs.food],
       [T("التنقل داخل المدينة (للشخص في اليوم)", "Getting around (per person per day)"), c.costs.transport],
     ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : `<span class='sub'>${T("مشمول", "Included")}</span>`}</td>`).join("")}</tr>`).join("");
@@ -625,6 +631,7 @@
             <div><dt>${T("السكن لليلة", "Hotels per night")}</dt><dd>${T(`من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}`, `${money(c.costs.hotel.eco)} – ${money(c.costs.hotel.lux)}`)}</dd></div>
             <div><dt>${T("أقرب مطار", "Nearest airport")}</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} ${T("بالطريق", "by road")})`}</dd></div>
           </dl>
+          <div class="facts-book">🛏️ ${T("أسعار السكن الحقيقية الحين:", "Live lodging prices:")} ${bookingLinks(c, getPlan().travelers)}</div>
           <a class="btn no-print" href="${B()}/plan">${T("كم تكفيني ميزانيتي؟", "What will my budget cover?")}</a>
         </aside>
       </div>`;
@@ -685,6 +692,7 @@
     const done = store.get("checklist", {});
     const total = D.before.reduce((s, b) => s + b.points.length, 0);
     const blocks = D.before.map((b, bi) => `
+      ${bi === 0 && passport() !== "sa" ? `<div class="check-card visa-card"><h2><span>🛂 ${T("تأشيرتك", "Your visa")} — ${PASS.find((x) => x[0] === passport())[1]}</span></h2><p>${esc(visaText(D))}</p><div class="src">${T("المصدر", "Source")}: <a href="https://en.wikipedia.org/wiki/Visa_requirements_for_Yemeni_citizens" target="_blank" rel="noopener">${T("ويكيبيديا: متطلبات التأشيرة لليمنيين", "Wikipedia: visa requirements for Yemeni citizens")}</a>، <a href="https://www.passportindex.org/passport/yemen/" target="_blank" rel="noopener">Passport Index</a>. ${T("تتغير كثير، فتأكد من السفارة.", "Rules change often — confirm with the embassy.")}</div></div>` : ""}
       <div class="check-card" data-card="${bi}">
         <h2><span>${b.icon} ${esc(b.title)}</span><small data-count="${bi}"></small></h2>
         ${b.points.map((p, pi) => `<label class="check"><input type="checkbox" data-k="${bi}-${pi}" ${done[bi + "-" + pi] ? "checked" : ""}><span>${esc(p)}</span></label>`).join("")}
@@ -695,6 +703,7 @@
         <div class="page-title">
           <h1 class="display">${T("جهّز شنطتك", "Pack your bags")}</h1>
           <p class="lead">${T("كل اللي تحتاج تعرفه قبل السفر. أشّر على اللي خلصته، والقائمة تنحفظ على جهازك.", "Everything to sort out before you fly. Tick items off — your list is saved on this device.")}</p>
+          ${passportPicker()}
         </div>
         <div class="progress"><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
         <div class="checklist">${blocks}</div>
@@ -726,7 +735,47 @@
   }
 
   // برنامج وتكلفة لمسار محدد بفئة محددة
-  function planRoute(route, { days, tier, interests, travelers }) {
+  // السكن: فندق (غرفة لكل شخصين)، شقة Airbnb كاملة (تكفي 4)، أو غرفة خاصة في Airbnb. أسعار Airbnb تقديرية مشتقة من أسعار الفنادق
+  const STAY = { hotel: 1, apt: { eco: 1.15, mid: 1.05, lux: 0.9 }, room: 0.7 };
+  function lodging(c, tier, stay, travelers) {
+    if (stay === "apt") return c.costs.hotel[tier] * STAY.apt[tier] * Math.ceil(travelers / 4);
+    if (stay === "room") return c.costs.hotel[tier] * STAY.room * Math.ceil(travelers / 2);
+    return c.costs.hotel[tier] * Math.ceil(travelers / 2);
+  }
+  const PREF_KEYS = ["hotel", "food", "transport"];
+  const sameTiers = (t) => t.hotel === t.food && t.food === t.transport;
+  function tiersLabel(t, short) {
+    if (sameTiers(t)) return D.tiers[t.hotel].name;
+    const ic = { hotel: "🏨", food: "🍽️", transport: "🚕" };
+    return PREF_KEYS.map((k) => `${ic[k]} ${D.tiers[t[k]].name}`).join(short ? " " : " · ");
+  }
+  // الجواز: سعودي، يمني، أو يمني مقيم في السعودية
+  const PASS = [["sa", T("🇸🇦 سعودي", "🇸🇦 Saudi")], ["ye", T("🇾🇪 يمني", "🇾🇪 Yemeni")], ["res", T("🇾🇪 يمني مقيم بالسعودية", "🇾🇪 Yemeni, Saudi resident")]];
+  const passport = () => store.get("passport", "sa");
+  function visaText(c) {
+    const pp = passport();
+    if (pp === "sa") return c.visaNote;
+    const v = window.VISA_YE && window.VISA_YE[c.id];
+    return v ? v[pp][EN_ON ? 1 : 0] : T("تأكد من السفارة.", "Check with the embassy.");
+  }
+  function passportPicker() {
+    return `<div class="pass-pick" role="radiogroup" aria-label="${T("جوازك", "Your passport")}"><span>${T("جوازك:", "Passport:")}</span>${PASS.map(([v, l]) => `<label><input type="radio" name="passport" value="${v}" ${passport() === v ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>`;
+  }
+  document.addEventListener("change", (e) => {
+    if (e.target.name !== "passport") return;
+    store.set("passport", e.target.value);
+    const y = window.scrollY; render(); window.scrollTo({ top: y, behavior: "instant" });
+  });
+  function bookingLinks(c, travelers) {
+    const ce = (window.EN_DATA && window.EN_DATA.asia && window.EN_DATA.asia[D.id]) || "";
+    const q = cityWiki(c) + (ce ? ", " + ce : "");
+    const b = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}&group_adults=${travelers}&no_rooms=${Math.ceil(travelers / 2)}`;
+    const a = `https://www.airbnb.com/s/${encodeURIComponent(q)}/homes?adults=${travelers}`;
+    return `<span class="book-links"><a href="${b}" target="_blank" rel="noopener">Booking ↗</a><a href="${a}" target="_blank" rel="noopener">Airbnb ↗</a></span>`;
+  }
+
+  function planRoute(route, { days, tier, tiers, stay = "hotel", interests, travelers }) {
+    tiers = tiers || { hotel: tier, food: tier, transport: tier };
     if (route.reduce((s, c) => s + c.days.min, 0) > days) return null;
     const alloc = new Map(route.map((c) => [c, c.days.min]));
     let left = days - route.reduce((s, c) => s + c.days.min, 0);
@@ -749,7 +798,7 @@
         .sort((a, b) => (interests.includes(b.type) ? 1 : 0) - (interests.includes(a.type) ? 1 : 0));
       const slotsOf = (p) => (p.time.includes("يوم كامل") || p.time === "Full day" ? 2 : 1);
       const tr = ci > 0 ? travel(route[ci - 1], c) : null;
-      if (tr) inter += tr.cost[tier];
+      if (tr) inter += tr.cost[tiers.transport];
       for (let d = 0; d < n; d++) {
         dayNo++;
         const last = dayNo === days;
@@ -769,9 +818,9 @@
         if (slots > 0 && !items.length) items.push({ t: T("يوم حر: تسوق وراحة وتجربة أكل محلي", "Free day: shopping, rest and local food"), k: "free" });
         if (last) items.push({ t: T("المغادرة", "Departure"), k: "out" });
         plan.push({ day: dayNo, city: c, items, travel: d === 0 && tr ? { from: route[ci - 1], ...tr } : null, newCity: d === 0 });
-        food += c.costs.food[tier];
-        local += c.costs.transport[tier];
-        if (!last) hotel += c.costs.hotel[tier] * rooms;
+        food += c.costs.food[tiers.food];
+        local += c.costs.transport[tiers.transport];
+        if (!last) hotel += lodging(c, tiers.hotel, stay, travelers);
       }
     });
     const parts = {
@@ -779,7 +828,7 @@
       visa: D.visaSAR * D.currency.perSAR * travelers,
       flights: 0,
     };
-    return { route, alloc, plan, parts, tier };
+    return { route, alloc, plan, parts, tier: tier || tiers.hotel, tiers, stay };
   }
   const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.flightSAR * D.currency.perSAR * travelers : 0);
 
@@ -814,18 +863,25 @@
     const fits = [], over = [];
     for (const route of candidates(s.days, s.interests)) {
       // كل مستوى يناسب الميزانية خيار مستقل
+      // كل بند (سكن، أكل، تنقل) إما محدد من المستخدم أو تلقائي يتغير مع المستوى
+      const pref = s.prefs || {};
       let cheapest = null, any = false;
+      const tried = new Set();
       for (const tier of ["lux", "mid", "eco"]) {
-        const r = planRoute(route, { ...s, tier });
+        const tiers = Object.fromEntries(PREF_KEYS.map((k) => [k, pref[k] && pref[k] !== "auto" ? pref[k] : tier]));
+        const key = PREF_KEYS.map((k) => tiers[k]).join("-");
+        if (tried.has(key)) continue;
+        tried.add(key);
+        const r = planRoute(route, { ...s, tier, tiers, stay: pref.stay || "hotel" });
         if (!r) break;
         r.total = totalOf(r, s.flights, s.travelers);
-        if (tier === "eco") cheapest = r;
+        cheapest = r;
         if (r.total <= budget) { fits.push(r); any = true; }
       }
       if (!any && cheapest) over.push(cheapest);
     }
     const tierRank = { lux: 3, mid: 2, eco: 1 };
-    const value = (r) => r.route.reduce((a, c) => a + score(c, s.interests) * r.alloc.get(c), 0) / s.days + tierRank[r.tier] * 1.2 + r.route.length * 0.15;
+    const value = (r) => r.route.reduce((a, c) => a + score(c, s.interests) * r.alloc.get(c), 0) / s.days + PREF_KEYS.reduce((a, k) => a + tierRank[r.tiers[k]], 0) * 0.4 + r.route.length * 0.15;
     fits.sort((a, b) => value(b) - value(a));
     over.sort((a, b) => a.total - b.total);
     return { fits, over };
@@ -881,6 +937,19 @@
               <span class="label">${T("وش تحب؟", "What do you enjoy?")} <small class="hint" style="margin:0">${T("اختياري", "optional")}</small></span>
               <div class="chips">${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="interest" value="${k}" ${s.interests.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}</div>
             </div>
+            <div class="field prefs">
+              <span class="label">${T("وزّع ميزانيتك على كيفك", "Spend where it matters to you")}</span>
+              <div class="pref-presets">
+                <button type="button" class="chip-btn" data-preset="foodie">🍽️ ${T("أكل رهيب وفندق رخيص", "Great food, cheap hotel")}</button>
+                <button type="button" class="chip-btn" data-preset="comfort">🏨 ${T("سكن وتنقل فخم، أكل بسيط", "Plush stay & rides, simple food")}</button>
+                <button type="button" class="chip-btn" data-preset="ride">🚕 ${T("تنقل مريح والباقي اقتصادي", "Comfy transport, rest budget")}</button>
+                <button type="button" class="chip-btn" data-preset="auto">↺ ${T("تلقائي", "Auto")}</button>
+              </div>
+              ${[["hotel", T("🏨 السكن", "🏨 Stay")], ["food", T("🍽️ الأكل", "🍽️ Food")], ["transport", T("🚕 التنقل", "🚕 Getting around")]].map(([k, lbl]) => `
+              <div class="pref-row"><span>${lbl}</span><div class="seg mini">${["auto", "eco", "mid", "lux"].map((t) => `<label><input type="radio" name="p_${k}" value="${t}" ${(s.prefs && s.prefs[k] || "auto") === t ? "checked" : ""}><span>${t === "auto" ? T("تلقائي", "Auto") : D.tiers[t].name}</span></label>`).join("")}</div></div>`).join("")}
+              <div class="pref-row"><span>${T("نوع السكن", "Stay type")}</span><div class="seg mini">${[["hotel", T("فندق", "Hotel")], ["apt", T("شقة Airbnb", "Airbnb flat")], ["room", T("غرفة Airbnb", "Airbnb room")]].map(([v, l]) => `<label><input type="radio" name="p_stay" value="${v}" ${(s.prefs && s.prefs.stay || "hotel") === v ? "checked" : ""}><span>${l}</span></label>`).join("")}</div></div>
+              <small class="hint">${T("التلقائي يختار لك أفضل مستوى تكفيه ميزانيتك. أسعار Airbnb تقديرية.", "Auto picks the best level your budget allows. Airbnb prices are estimates.")}</small>
+            </div>
             <div class="field">
               <label class="toggle"><input type="checkbox" id="flights" ${s.flights ? "checked" : ""}><span>${T("الميزانية تشمل تذاكر الطيران من السعودية", "Budget includes flights from Saudi Arabia")} <small>(${T(`تقدير ${money(D.flightSAR * D.currency.perSAR)} للشخص ذهاب وعودة`, `est. ${money(D.flightSAR * D.currency.perSAR)} return per person`)})</small></span></label>
             </div>
@@ -903,6 +972,12 @@
       travelers,
       interests: [...form.querySelectorAll("input[name=interest]:checked")].map((i) => i.value),
       flights: form.flights.checked,
+      prefs: {
+        hotel: form.querySelector("input[name=p_hotel]:checked").value,
+        food: form.querySelector("input[name=p_food]:checked").value,
+        transport: form.querySelector("input[name=p_transport]:checked").value,
+        stay: form.querySelector("input[name=p_stay]:checked").value,
+      },
     }; };
     const update = (now) => {
       const st = read();
@@ -916,6 +991,17 @@
     form.addEventListener("input", () => update());
     form.addEventListener("change", () => update());
     budgetIn.addEventListener("blur", () => { const v = parseFloat(budgetIn.value.replace(/[^\d.]/g, "")); if (v) budgetIn.value = fmt(v); });
+    const PRESETS = {
+      foodie: { hotel: "eco", food: "lux", transport: "auto" },
+      comfort: { hotel: "lux", food: "eco", transport: "lux" },
+      ride: { hotel: "eco", food: "eco", transport: "lux" },
+      auto: { hotel: "auto", food: "auto", transport: "auto" },
+    };
+    form.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+      const pr = PRESETS[b.dataset.preset];
+      PREF_KEYS.forEach((k) => { form.querySelector(`input[name=p_${k}][value=${pr[k]}]`).checked = true; });
+      update(true);
+    }));
     form.querySelectorAll("[data-b]").forEach((b) => b.addEventListener("click", () => { budgetIn.value = fmt(+b.dataset.b); update(true); }));
     update(true);
   }
@@ -933,7 +1019,7 @@
       return `
         <article class="opt tkt ${isOver ? "over" : ""}">
           <div class="tkt-main">
-            <div class="opt-art">${cityScene(r.route[0], true)}${photoOver(cityWiki(r.route[0]))}<span class="tier-badge t-${r.tier}">${D.tiers[r.tier].name}</span></div>
+            <div class="opt-art">${cityScene(r.route[0], true)}${photoOver(cityWiki(r.route[0]))}<span class="tier-badge t-${sameTiers(r.tiers) ? r.tier : "mix"}">${tiersLabel(r.tiers, true)}</span></div>
             <h3>${r.route.map((c) => esc(c.short)).join(` ${FWD} `)}</h3>
             <div class="stops">${chips}</div>
           </div>
@@ -999,6 +1085,9 @@
           <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${T(`${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}`, `${dayWord(sec.days.length)} · day ${sec.days[0].day}${sec.days.length > 1 ? "–" + sec.days[sec.days.length - 1].day : ""}`)}</span></div>
           <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>${T("عن الوجهة", "About")}</a>
         </header>
+        <div class="leg-book">🛏️ ${T("شوف أسعار السكن الحقيقية:", "Check live prices:")} ${bookingLinks(sec.city, s.travelers)}</div>
+        <header style="display:none">
+        </header>
         ${sec.days.map((d) => `
           <div class="pday">
             <div class="pday-n"><small>${T("اليوم", "Day")}</small>${d.day}</div>
@@ -1022,7 +1111,7 @@
             <div class="pass-fields">
               <div>${T("المدة", "Length")}<b>${dayWord(s.days)}</b></div>
               <div>${T("المسافرون", "Travellers")}<b>${paxWord(s.travelers)}</b></div>
-              <div>${T("المستوى", "Comfort")}<b>${D.tiers[r.tier].name}</b></div>
+              <div>${T("المستوى", "Comfort")}<b>${tiersLabel(r.tiers, true)}</b></div>
               <div>${T("المحطات", "Stops")}<b>${EN_ON ? r.route.length + (r.route.length === 1 ? " stop" : " stops") : r.route.length === 1 ? "وجهة وحدة" : r.route.length === 2 ? "وجهتين" : r.route.length + " وجهات"}</b></div>
             </div>
           </div>
@@ -1039,7 +1128,7 @@
           <div>${T("رسوم الأماكن", "Entry fees")}<b>${money(p.fees)}</b></div>
           <div>${T("التأشيرة", "Visa")}${s.flights ? T(" والطيران", " & flights") : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
         </div>
-        <p class="hint">${D.tiers[r.tier].desc}. ${T("السكن محسوب غرفة لكل شخصين، والأسعار تقريبية ومصادرها في صفحة كل وجهة.", "Hotels assume one room per two travellers. Prices are estimates — sources are on each destination page.")}</p>
+        <p class="hint">${sameTiers(r.tiers) ? D.tiers[r.tier].desc + ". " : ""}${r.stay === "apt" ? T("السكن شقة Airbnb كاملة لكل 4 أشخاص (سعر تقديري).", "Lodging is a whole Airbnb apartment per 4 people (estimated price).") : r.stay === "room" ? T("السكن غرفة خاصة في Airbnb لكل شخصين (سعر تقديري).", "Lodging is a private Airbnb room per 2 people (estimated price).") : T("السكن غرفة فندقية لكل شخصين.", "Hotels assume one room per two travellers.")} ${T("الأسعار تقريبية، وتقدر تشوف السعر الحقيقي من روابط Booking وAirbnb في كل وجهة.", "Prices are estimates — check live prices with the Booking and Airbnb links for each stop.")}</p>
         <div class="trip">
           <div class="legs">${days}</div>
           <div class="map">${mapSVG(r.route, { animate: true })}</div>
