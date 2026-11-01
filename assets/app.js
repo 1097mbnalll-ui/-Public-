@@ -25,19 +25,29 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* تجاهل */ } },
   };
+  // اللغة: عربي أو إنجليزي
+  const qsLang = (location.search.match(/[?&]lang=(ar|en)/) || [])[1];
+  if (qsLang) store.set("lang", qsLang);
+  const EN_ON = store.get("lang", "ar") === "en";
+  const T = (ar, en) => (EN_ON ? en : ar);
+  const FWD = EN_ON ? "→" : "←";
+  if (EN_ON && window.applyEnglish) window.applyEnglish();
+  document.documentElement.lang = EN_ON ? "en" : "ar";
+  document.documentElement.dir = EN_ON ? "ltr" : "rtl";
+  document.body.classList.toggle("lang-en", EN_ON);
   let currency = store.get("currency", "SAR");
   if (currency === "VND") currency = "LOCAL";
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (n, digits = 0) => n.toLocaleString("en-US", { maximumFractionDigits: digits });
-  const dayWord = (n) => (n === 1 ? "يوم" : n === 2 ? "يومين" : n <= 10 ? n + " أيام" : n + " يوم");
-  const optWord = (n) => (n === 1 ? "خيار واحد" : n === 2 ? "خيارين" : n <= 10 ? `<b>${n}</b> خيارات` : `<b>${n}</b> خيار`);
-  const paxWord = (n) => (n === 1 ? "شخص" : n === 2 ? "شخصين" : n + " أشخاص");
+  const dayWord = (n) => (EN_ON ? (n === 1 ? "1 day" : n + " days") : n === 1 ? "يوم" : n === 2 ? "يومين" : n <= 10 ? n + " أيام" : n + " يوم");
+  const optWord = (n) => (EN_ON ? (n === 1 ? "<b>1</b> option" : `<b>${n}</b> options`) : n === 1 ? "خيار واحد" : n === 2 ? "خيارين" : n <= 10 ? `<b>${n}</b> خيارات` : `<b>${n}</b> خيار`);
+  const paxWord = (n) => (EN_ON ? (n === 1 ? "1 traveller" : n + " travellers") : n === 1 ? "شخص" : n === 2 ? "شخصين" : n + " أشخاص");
   const rate = (cur = currency) => (cur === "SAR" ? D.currency.perSAR : cur === "USD" ? D.currency.perUSD : 1);
-  const curName = (cur = currency) => (cur === "SAR" ? "ريال" : cur === "USD" ? "دولار" : D.currency.name);
+  const curName = (cur = currency) => (cur === "SAR" ? T("ريال", "SAR") : cur === "USD" ? T("دولار", "USD") : D.currency.name);
 
   function money(vnd, cur = currency) {
-    if (vnd === 0) return "مجانًا";
+    if (vnd === 0) return T("مجانًا", "Free");
     if (cur === "LOCAL") { const r = D.currency.round || 1; return fmt(Math.max(r, Math.round(vnd / r) * r)) + " " + D.currency.name; }
     if (cur === "USD") {
       const v = vnd / D.currency.perUSD;
@@ -45,7 +55,7 @@
     }
     const v = vnd / D.currency.perSAR;
     const r = v < 20 ? Math.round(v) : v < 500 ? Math.round(v / 5) * 5 : Math.round(v / 10) * 10;
-    return fmt(Math.max(r, 1)) + " ريال";
+    return EN_ON ? "SAR " + fmt(Math.max(r, 1)) : fmt(Math.max(r, 1)) + " ريال";
   }
   function money2(vnd) {
     if (vnd === 0 || currency === "LOCAL") return money(vnd);
@@ -55,8 +65,8 @@
     const links = [id, id2].filter(Boolean).map((i) => {
       const s = D.sources[i];
       return s ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : "";
-    }).join("، ");
-    return `<div class="src">المصدر: ${links}${date ? `، آخر تحقق ${esc(date)}` : ""}</div>`;
+    }).join(T("، ", ", "));
+    return `<div class="src">${T("المصدر", "Source")}: ${links}${date ? `${T("، آخر تحقق", ", last checked")} ${esc(date)}` : ""}</div>`;
   }
   const scene = (key, mid) => {
     const out = window.SCENES[key] ? window.SCENES[key]() : "";
@@ -72,8 +82,8 @@
     return 2 * R * Math.asin(Math.sqrt(h)) * 1.3; // تقريب لمسافة الطريق
   }
   const U = (usd) => usd * D.currency.perUSD;
-  const groundLeg = (d, ferry) => ({ hours: d / 45 + (ferry ? 1 : 0), mode: ferry ? "عبّارة أو سيارة" : "باص أو سيارة", cost: { eco: U(Math.max(5, d * 0.05)), mid: U(Math.max(10, d * 0.085)), lux: U(Math.max(35, d * 0.42)) } });
-  const flightLeg = (d) => ({ hours: 1 + d / 750, mode: "طيران", cost: { eco: U(35 + d * 0.027), mid: U(55 + d * 0.038), lux: U(115 + d * 0.076) } });
+  const groundLeg = (d, ferry) => ({ hours: d / 45 + (ferry ? 1 : 0), mode: ferry ? T("عبّارة أو سيارة", "Ferry or car") : T("باص أو سيارة", "Bus or car"), cost: { eco: U(Math.max(5, d * 0.05)), mid: U(Math.max(10, d * 0.085)), lux: U(Math.max(35, d * 0.42)) } });
+  const flightLeg = (d) => ({ hours: 1 + d / 750, mode: T("طيران", "Flight"), flight: true, cost: { eco: U(35 + d * 0.027), mid: U(55 + d * 0.038), lux: U(115 + d * 0.076) } });
   const hubOf = (c) => (c.code ? c : cityById[c.hub]);
 
   function travel(a, b) {
@@ -90,16 +100,16 @@
       if (ha !== a) legs.push(groundLeg(a.hubKm));
       legs.push(flightLeg(km(ha, hb)));
       if (hb !== b) legs.push(groundLeg(b.hubKm));
-      const mode = legs.map((l) => l.mode).join(" ثم ").replace("طيران", `طيران ${ha.code}←${hb.code}`);
+      const mode = legs.map((l) => (l.flight ? `${l.mode} ${EN_ON ? `${ha.code}→${hb.code}` : `${ha.code}←${hb.code}`}` : l.mode)).join(T(" ثم ", " then "));
       res = {
-        mode, hours: legs.reduce((s, l) => s + l.hours, 0) + (legs.length - 1) * 1,
+        flight: true, mode, hours: legs.reduce((s, l) => s + l.hours, 0) + (legs.length - 1) * 1,
         cost: Object.fromEntries(TIERS.map((t) => [t, legs.reduce((s, l) => s + l.cost[t], 0)])),
       };
     }
     travelCache.set(key, res);
     return res;
   }
-  const hoursText = (h) => { const r = Math.round(h); return h < 1 ? "أقل من ساعة" : h < 1.75 ? "حوالي ساعة" : r === 2 ? "حوالي ساعتين" : r <= 10 ? `حوالي ${r} ساعات` : `حوالي ${r} ساعة`; };
+  const hoursText = (h) => { const r = Math.round(h); if (EN_ON) return h < 1 ? "under an hour" : h < 1.75 ? "about 1 hour" : `about ${r} hours`; return h < 1 ? "أقل من ساعة" : h < 1.75 ? "حوالي ساعة" : r === 2 ? "حوالي ساعتين" : r <= 10 ? `حوالي ${r} ساعات` : `حوالي ${r} ساعة`; };
 
   // ---------- الخريطة ----------
   const OUTLINE = "M82.5,5 L117.5,15 L135,37.5 L150,50 L117.5,67.5 L100,90 L95,120 L112.5,140 L115,150 L140,175 L155,185 L172.5,210 L180,242.5 L182.5,260 L180,282.5 L180,290 L175,300 L152.5,315 L127.5,328.75 L117.5,345 L70,372.5 L70,350 L62.5,327.5 L77.5,315 L105,312.5 L110,295 L137.5,280 L140,250 L137.5,220 L140,202.5 L130,182.5 L112.5,172.5 L100,152.5 L90,132.5 L62.5,117.5 L50,105 L67.5,90 L30,72.5 L25,50 L5,30 L12.5,20 L37.5,22.5 L57.5,17.5 Z";
@@ -128,7 +138,7 @@
         (active ? `<text x="${left ? p.x - 8 : p.x + 8}" y="${p.y + 4}" text-anchor="${left ? "end" : "start"}">${esc(c.short)}</text>` : "");
     }).join("");
     return `
-      <svg viewBox="-60 0 300 380" role="img" aria-label="خريطة ${esc(D.name)} ومسار الرحلة">
+      <svg viewBox="-60 0 300 380" role="img" aria-label="${T("خريطة", "Map of")} ${esc(D.name)}">
         ${D.id === "vietnam" ? `<path class="land" d="${OUTLINE}"/><path class="land" d="${ISLAND}"/>` : `<rect class="land" x="-10" y="0" width="260" height="380" rx="24" opacity="0.6"/>`}
         ${stops.length > 1 ? `<mask id="${id}"><path class="reveal ${animate ? "draw" : ""}" d="${d}" pathLength="1" style="--len:1"/></mask><path class="route" d="${d}" mask="url(#${id})"/>` : ""}
         ${dots}
@@ -196,7 +206,7 @@
           ${showCity ? `<span class="pcard-city">${esc(p.city.name)}</span>` : ""}
           <span class="pcard-name">${esc(p.name)}</span>
           <span class="pcard-desc">${esc(p.desc)}</span>
-          <span class="pcard-meta"><b>${p.fee ? money(p.fee) : "مجانًا"}</b><span>⏱ ${esc(p.time)}</span></span>
+          <span class="pcard-meta"><b>${p.fee ? money(p.fee) : T("مجانًا", "Free")}</b><span>⏱ ${esc(p.time)}</span></span>
         </span>
       </button>`;
   }
@@ -213,16 +223,17 @@
   // ملخص المكان من ويكيبيديا العربية (لو موجود)
   const sumCache = {};
   async function fetchSummary(info, el) {
-    if (!info || !info.ar || !el) return;
-    let txt = sumCache[info.ar];
+    const title = EN_ON ? info && info.title : info && info.ar;
+    if (!title || !el) return;
+    let txt = sumCache[title];
     if (txt === undefined) {
       try {
-        const u = "https://ar.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro=1&explaintext=1&exsentences=4&redirects=1&titles=" + encodeURIComponent(info.ar);
+        const u = `https://${EN_ON ? "en" : "ar"}.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro=1&explaintext=1&exsentences=4&redirects=1&titles=` + encodeURIComponent(title);
         const j = await (await fetch(u)).json();
         const pg = Object.values((j.query || {}).pages || {})[0] || {};
         txt = (pg.extract || "").trim();
       } catch (e) { txt = ""; }
-      sumCache[info.ar] = txt;
+      sumCache[title] = txt;
     }
     if (txt) { el.textContent = txt; el.closest(".about").classList.add("has-wiki"); }
   }
@@ -232,25 +243,25 @@
     if (!p) return;
     const info = photoCache[p.wiki] || {};
     const big = info.src ? info.src.replace(/\/\d+px-/, "/1280px-") : "";
-    const wikiLink = info.ar ? `https://ar.wikipedia.org/wiki/${encodeURIComponent(info.ar)}` : p.wiki ? `https://en.wikipedia.org/wiki/${encodeURIComponent(info.title || p.wiki)}` : "";
+    const wikiLink = info.ar && !EN_ON ? `https://ar.wikipedia.org/wiki/${encodeURIComponent(info.ar)}` : p.wiki ? `https://en.wikipedia.org/wiki/${encodeURIComponent(info.title || p.wiki)}` : "";
     pdlg.innerHTML = `
       <div class="dlg-in">
-        <button type="button" class="dlg-x" data-close aria-label="إغلاق">✕</button>
+        <button type="button" class="dlg-x" data-close aria-label="${T("إغلاق", "Close")}">✕</button>
         <div class="dlg-ph ${big ? "" : "empty"}">${big ? `<img src="${esc(big)}" alt="${esc(p.name)}">` : `<span class="ph-ico">${ICONS[p.type] || "📍"}</span>`}</div>
         <div class="dlg-body">
           <a class="pcard-city" href="${B()}/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
           <h2>${esc(p.name)}</h2>
           <div class="about">
             <p class="about-desc">${esc(p.desc)}</p>
-            <div class="about-wiki"><span class="about-label">نبذة من ويكيبيديا</span><p id="wikiSum"></p></div>
+            <div class="about-wiki"><span class="about-label">${T("نبذة من ويكيبيديا", "From Wikipedia")}</span><p id="wikiSum"></p></div>
           </div>
           <div class="dlg-facts">
-            <div>الدخول<b>${p.fee ? money(p.fee) : "مجانًا"}</b></div>
-            <div>الوقت المقترح<b>${esc(p.time)}</b></div>
-            <div>النوع<b>${ICONS[p.type]} ${esc(D.interests[p.type])}</b></div>
+            <div>${T("الدخول", "Entry")}<b>${p.fee ? money(p.fee) : T("مجانًا", "Free")}</b></div>
+            <div>${T("الوقت المقترح", "Time needed")}<b>${esc(p.time)}</b></div>
+            <div>${T("النوع", "Type")}<b>${ICONS[p.type]} ${esc(D.interests[p.type])}</b></div>
           </div>
-          ${wikiLink ? `<p class="dlg-more"><a href="${wikiLink}" target="_blank" rel="noopener">اقرأ أكثر عنه في ويكيبيديا${info.ar ? "" : " (بالإنجليزي)"}</a></p>` : ""}
-          ${info.file ? `<div class="src">الصورة: <a href="https://en.wikipedia.org/wiki/File:${encodeURIComponent(info.file)}" target="_blank" rel="noopener">ويكيميديا كومنز</a>، برخصة حرة</div>` : ""}
+          ${wikiLink ? `<p class="dlg-more"><a href="${wikiLink}" target="_blank" rel="noopener">${T(`اقرأ أكثر عنه في ويكيبيديا${info.ar ? "" : " (بالإنجليزي)"}`, "Read more on Wikipedia")}</a></p>` : ""}
+          ${info.file ? `<div class="src">${T("الصورة", "Photo")}: <a href="https://en.wikipedia.org/wiki/File:${encodeURIComponent(info.file)}" target="_blank" rel="noopener">Wikimedia Commons</a>${T("، برخصة حرة", ", free licence")}</div>` : ""}
           ${src(p.src, p.date)}
         </div>
       </div>`;
@@ -309,10 +320,10 @@
   function ticketForm(id, { amount, unit, days, travelers, go }) {
     return `
       <form class="ticket" id="${id}">
-        <label class="f"><small>الميزانية (${unit})</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="الميزانية"></label>
-        <label class="f"><small>المدة</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], days, dayWord)}</select></label>
-        <label class="f"><small>المسافرين</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], travelers, paxWord)}</select></label>
-        <button class="go" type="submit">${go} ←</button>
+        <label class="f"><small>${T("الميزانية", "Budget")} (${unit})</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="${T("الميزانية", "Budget")}"></label>
+        <label class="f"><small>${T("المدة", "Trip length")}</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], days, dayWord)}</select></label>
+        <label class="f"><small>${T("المسافرين", "Travellers")}</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], travelers, paxWord)}</select></label>
+        <button class="go" type="submit">${go} ${FWD}</button>
       </form>`;
   }
   const readTicket = (f) => ({ b: parseFloat(f.b.value.replace(/[^\d.]/g, "")) || 0, d: +f.d.value, t: +f.t.value });
@@ -323,18 +334,18 @@
     const st = getPlan();
     const cards = W.continents.map((k, i) => posterCard({
       href: k.open ? `#/${k.id}` : "", soon: !k.open, art: scene(k.scene, true), i,
-      title: k.name, left: esc(k.blurb), right: k.open ? `${readyIn(k.id).length} دول جاهزة` : "قريبًا",
+      title: k.name, left: esc(k.blurb), right: k.open ? T(`${readyIn(k.id).length} دول جاهزة`, `${readyIn(k.id).length} countries ready`) : T("قريبًا", "Coming soon"),
     })).join("");
     app.innerHTML = posterHero({
-      kick: "🌏 دليلك العربي للسفر",
-      title: "ميزانيتك", sub: "توديك وين؟",
-      lead: "اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.",
-      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: "ريال", days: st.days, travelers: st.travelers, go: "وين تكفيني؟" }),
-      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: "كبادوكيا", caption: "🇹🇷 تركيا · بالونات الشروق", stamp: "آسيا<br>7 دول<br>جاهزة" },
+      kick: T("🌏 دليلك العربي للسفر", "🌏 Travel planning that starts with your budget"),
+      title: T("ميزانيتك", "Your budget,"), sub: T("توديك وين؟", "where can it take you?"),
+      lead: T("اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend, and we'll pin up a poster for every country it covers — how many days, what comfort level, and what you'll have left."),
+      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, go: T("وين تكفيني؟", "Where can I go?") }),
+      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T("آسيا<br>7 دول<br>جاهزة", "Asia<br>7 countries<br>ready") },
     }) + `
       <div class="wrap">
         <section class="band">
-          <div class="band-head"><div><h2 class="display">اختر قارتك</h2><p>بدأنا بآسيا، والقارات الباقية جاية.</p></div></div>
+          <div class="band-head"><div><h2 class="display">${T("اختر قارتك", "Pick a continent")}</h2><p>${T("بدأنا بآسيا، والقارات الباقية جاية.", "We've started with Asia — the rest of the world is on its way.")}</p></div></div>
           <div class="posters">${cards}</div>
         </section>
       </div>`;
@@ -356,25 +367,25 @@
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
-          <div class="kick"><a href="#/">القارات</a> ‹ ${esc(k.name)}</div>
-          <h1 class="display">${esc(k.name)} <span class="gold">بانتظارك</span></h1>
-          <p class="lead">${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.</p>
+          <div class="kick"><a href="#/">${T("القارات", "Continents")}</a> ${T("‹", "›")} ${esc(k.name)}</div>
+          <h1 class="display">${EN_ON ? `${esc(k.name)} <span class="gold">awaits</span>` : `${esc(k.name)} <span class="gold">بانتظارك</span>`}</h1>
+          <p class="lead">${T(`${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.`, `${list.length} non-Arab countries. ${readyIn(cid).length} are fully covered, with more added all the time.`)}</p>
         </div>
         <form class="fit-form" id="fitForm" onsubmit="return false">
-          <label>ميزانيتي <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ريال</label>
-          <label>لمدة <select id="fd">${[4, 5, 7, 10, 14].map((d) => `<option ${d === st.days ? "selected" : ""} value="${d}">${dayWord(d)}</option>`).join("")}</select></label>
-          <label>لـ <select id="ft">${[1, 2, 3, 4, 5, 6].map((d) => `<option ${d === st.travelers ? "selected" : ""} value="${d}">${paxWord(d)}</option>`).join("")}</select></label>
-          <label class="toggle-inline"><input type="checkbox" id="ff" ${st.flights ? "checked" : ""}> شامل الطيران</label>
+          <label>${T("ميزانيتي", "My budget")} <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ${T("ريال", "SAR")}</label>
+          <label>${T("لمدة", "for")} <select id="fd">${[4, 5, 7, 10, 14].map((d) => `<option ${d === st.days ? "selected" : ""} value="${d}">${dayWord(d)}</option>`).join("")}</select></label>
+          <label>${T("لـ", "with")} <select id="ft">${[1, 2, 3, 4, 5, 6].map((d) => `<option ${d === st.travelers ? "selected" : ""} value="${d}">${paxWord(d)}</option>`).join("")}</select></label>
+          <label class="toggle-inline"><input type="checkbox" id="ff" ${st.flights ? "checked" : ""}> ${T("شامل الطيران", "incl. flights")}</label>
         </form>
         <div id="fit"></div>
         <section class="band">
-          <div class="band-head"><div><h2 class="display">كل الدول</h2></div></div>
+          <div class="band-head"><div><h2 class="display">${T("كل الدول", "All countries")}</h2></div></div>
           <div class="countries">${list.map((c) => {
             const ready = !!W.countries[c.id];
             const C = W.countries[c.id];
             return `<a class="country ${ready ? "" : "soon"}" ${ready ? `href="#/c/${c.id}"` : 'aria-disabled="true"'}>
               <span class="flag">${c.flag}</span><span class="cn">${esc(c.name)}</span>
-              <span class="cs">${ready ? `${C.cities.length} وجهة · ${C.cities.reduce((a, x) => a + x.places.length, 0)} مكان` : "قريبًا"}</span></a>`;
+              <span class="cs">${ready ? T(`${C.cities.length} وجهة · ${C.cities.reduce((a, x) => a + x.places.length, 0)} مكان`, `${C.cities.length} destinations · ${C.cities.reduce((a, x) => a + x.places.length, 0)} places`) : T("قريبًا", "Coming soon")}</span></a>`;
           }).join("")}</div>
         </section>
       </div>`;
@@ -393,20 +404,20 @@
         const s = { ...DEFAULT, ...s2, interests: [], budget: s2.budgetSAR * C.currency.perSAR };
         const { fits, over } = buildOptions(s);
         const best = fits[0] || over[0];
-        return { C, fits: fits.length, best, total: best ? best.total / C.currency.perSAR : 0, ok: !!fits.length, route: best ? best.route.map((x) => x.short).join(" ← ") : "", tier: best ? best.tier : "" };
+        return { C, fits: fits.length, best, total: best ? best.total / C.currency.perSAR : 0, ok: !!fits.length, route: best ? best.route.map((x) => x.short).join(` ${FWD} `) : "", tier: best ? best.tier : "" };
       });
       if (prev) setCountry(prev);
       rows.sort((a, b) => (b.ok - a.ok) || (b.fits - a.fits) || (a.total - b.total));
-      const sar = (v) => fmt(Math.round(v / 10) * 10) + " ريال";
+      const sar = (v) => (EN_ON ? "SAR " + fmt(Math.round(v / 10) * 10) : fmt(Math.round(v / 10) * 10) + " ريال");
       fit.innerHTML = `
-        <div class="sec-h"><h2 class="display">${rows.some((r) => r.ok) ? "تكفيك ميزانيتك في…" : "أقرب الدول لميزانيتك"}</h2><p>مرتبة من الأنسب لك</p></div>
+        <div class="sec-h"><h2 class="display">${rows.some((r) => r.ok) ? T("تكفيك ميزانيتك في…", "Your budget covers…") : T("أقرب الدول لميزانيتك", "Closest to your budget")}</h2><p>${T("مرتبة من الأنسب لك", "Best match first")}</p></div>
         <div class="posters">${rows.map((r, i) => `
           <a class="poster ${r.ok ? "" : "over"}" href="#/c/${r.C.id}/plan" style="--r:${tilt(i)}deg">
             <span class="fl">${r.C.flag}</span>
             <div class="art">${scene(r.C.scene, true)}</div>
             <h4>${esc(r.C.name)}</h4>
-            <p class="pline">${r.ok ? `${optWord(r.fits)} · أفضلها ${esc(W.tiers[r.tier].name)}` : `ما تكفي ${dayWord(s2.days)}`}<br><small>${esc(r.route)}</small></p>
-            <div class="meta"><span>${r.ok ? "يبقى معك" : "ينقصك"}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
+            <p class="pline">${r.ok ? `${optWord(r.fits)} · ${T("أفضلها", "best:")} ${esc(W.tiers[r.tier].name)}` : T(`ما تكفي ${dayWord(s2.days)}`, `Not enough for ${dayWord(s2.days)}`)}<br><small>${esc(r.route)}</small></p>
+            <div class="meta"><span>${r.ok ? T("يبقى معك", "Left over") : T("ينقصك", "Short by")}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
           </a>`).join("")}</div>`;
     };
     form.addEventListener("input", update);
@@ -419,47 +430,47 @@
     const plan = getPlan();
     const cards = D.cities.map((c, i) => posterCard({
       href: `${B()}/city/${c.id}`, art: cityScene(c, true), wiki: cityWiki(c), flag: c.emoji, i,
-      title: c.name, left: `${c.places.length} مكان · ${dayWord(c.days.ideal)}`, right: `من ${money(c.costs.hotel.eco)}`,
+      title: c.name, left: `${c.places.length} ${T("مكان", "places")} · ${dayWord(c.days.ideal)}`, right: `${T("من", "from")} ${money(c.costs.hotel.eco)}`,
     })).join("");
 
     const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
 
     const top = D.cities[0];
     app.innerHTML = posterHero({
-      kick: `<a href="#/${D.continent}">آسيا</a> ‹ ${D.flag}`,
+      kick: `<a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ${T("‹", "›")} ${D.flag}`,
       title: esc(D.name),
       lead: esc(D.tagline),
       body: `
         <div class="paper prep">
-          <div class="prep-h"><b class="display">قبل لا تحجز</b><span>🛂 ${esc(D.visaNote)}</span></div>
+          <div class="prep-h"><b class="display">${T("قبل لا تحجز", "Before you book")}</b><span>🛂 ${esc(D.visaNote)}</span></div>
           <div class="facts3">
-            <div>العملة<b>${esc(D.currency.name)} (${fmt(D.currency.perSAR, 2)} = ريال)</b></div>
-            <div>الطيران من السعودية<b>~${fmt(D.flightSAR)} ريال</b></div>
-            <div>الوجهات<b>${D.cities.length} وجهة · ${allPlaces.length} مكان</b></div>
+            <div>${T("العملة", "Currency")}<b>${T(`${esc(D.currency.name)} (${fmt(D.currency.perSAR, 2)} = ريال)`, `SAR 1 = ${fmt(D.currency.perSAR, 2)} ${esc(D.currency.name)}`)}</b></div>
+            <div>${T("الطيران من السعودية", "Flights from Saudi")}<b>${T(`~${fmt(D.flightSAR)} ريال`, `~SAR ${fmt(D.flightSAR)}`)}</b></div>
+            <div>${T("الوجهات", "Destinations")}<b>${T(`${D.cities.length} وجهة · ${allPlaces.length} مكان`, `${D.cities.length} destinations · ${allPlaces.length} places`)}</b></div>
           </div>
         </div>
-        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate()), unit: curName(), days: plan.days, travelers: plan.travelers, go: "وريني الخيارات" })}`,
-      poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: `${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, stamp: `${D.cities.length}<br>وجهات` },
+        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate()), unit: curName(), days: plan.days, travelers: plan.travelers, go: T("وريني الخيارات", "Show my options") })}`,
+      poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: T(`${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, `${top.places.length} places · ${dayWord(top.days.ideal)} suggested`), stamp: T(`${D.cities.length}<br>وجهات`, `${D.cities.length}<br>stops`) },
     }) + `
       <div class="wrap">
         <section class="band" id="cities">
-          <div class="band-head"><div><h2 class="display">الوجهات</h2><p>اضغط على أي ملصق وشوف أماكنه وأسعاره.</p></div></div>
+          <div class="band-head"><div><h2 class="display">${T("الوجهات", "Destinations")}</h2><p>${T("اضغط على أي ملصق وشوف أماكنه وأسعاره.", "Tap a poster to see its places and prices.")}</p></div></div>
           <div class="posters">${cards}</div>
         </section>
 
         <section class="band">
           <div class="band-head">
-            <div><h2 class="display">أماكن لازم تشوفها</h2><p>اضغط على أي مكان وشوف صورته وتفاصيله.</p></div>
-            <a class="btn ghost" href="${B()}/places">كل الأماكن (${allPlaces.length})</a>
+            <div><h2 class="display">${T("أماكن لازم تشوفها", "Don't miss")}</h2><p>${T("اضغط على أي مكان وشوف صورته وتفاصيله.", "Tap any place for photos and details.")}</p></div>
+            <a class="btn ghost" href="${B()}/places">${T("كل الأماكن", "All places")} (${allPlaces.length})</a>
           </div>
           <div class="pgrid">${picks.map((p) => placeCard(p, { showCity: true })).join("")}</div>
         </section>
 
         <section class="band">
           <div class="tiles">
-            <a class="tile" href="${B()}/before"><div class="ico">🧳</div><h3>قائمة التجهيز</h3><p>التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.</p></a>
-            <a class="tile" href="${B()}/places"><div class="ico">🕌</div><h3>أكل حلال ومساجد</h3><p>في كل وجهة قسم للمطاعم الحلال والمساجد القريبة.</p></a>
-            <div class="tile"><div class="ico">🔎</div><h3>كل رقم له مصدر</h3><p>جنب كل سعر مصدره وتاريخ آخر تحقق منه.</p></div>
+            <a class="tile" href="${B()}/before"><div class="ico">🧳</div><h3>${T("قائمة التجهيز", "Trip checklist")}</h3><p>${T("التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.", "Visa, money, SIM — tick things off as you go.")}</p></a>
+            <a class="tile" href="${B()}/places"><div class="ico">🕌</div><h3>${T("أكل حلال ومساجد", "Halal food & mosques")}</h3><p>${T("في كل وجهة قسم للمطاعم الحلال والمساجد القريبة.", "Every destination lists halal food and nearby mosques.")}</p></a>
+            <div class="tile"><div class="ico">🔎</div><h3>${T("كل رقم له مصدر", "Every number is sourced")}</h3><p>${T("جنب كل سعر مصدره وتاريخ آخر تحقق منه.", "Each price shows where it came from and when it was checked.")}</p></div>
           </div>
         </section>
       </div>`;
@@ -479,37 +490,37 @@
     if (!c) return viewNotFound();
 
     const tierRows = [
-      ["السكن (لليلة، غرفة لشخصين)", c.costs.hotel],
-      ["الأكل (للشخص في اليوم)", c.costs.food],
-      ["التنقل داخل المدينة (للشخص في اليوم)", c.costs.transport],
-    ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : "<span class='sub'>مشمول</span>"}</td>`).join("")}</tr>`).join("");
+      [T("السكن (لليلة، غرفة لشخصين)", "Stay (per night, room for two)"), c.costs.hotel],
+      [T("الأكل (للشخص في اليوم)", "Food (per person per day)"), c.costs.food],
+      [T("التنقل داخل المدينة (للشخص في اليوم)", "Getting around (per person per day)"), c.costs.transport],
+    ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : `<span class='sub'>${T("مشمول", "Included")}</span>`}</td>`).join("")}</tr>`).join("");
 
     const places = c.places.map((p, i) => placeCard({ ...p, city: c, key: D.id + ":" + c.id + ":" + i })).join("");
     const areas = c.stayAreas.map((a) => `<div class="area"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
     const mosques = c.halal.mosques.length
       ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
-      : `<p>ما فيه مساجد معروفة قريبة للسياح.</p>`;
+      : `<p>${T("ما فيه مساجد معروفة قريبة للسياح.", "No well-known mosques near the tourist areas.")}</p>`;
     const near = D.cities.filter((o) => o !== c).map((o) => ({ o, t: travel(c, o) })).sort((a, b) => a.t.hours - b.t.hours).slice(0, 6)
       .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td>${esc(t.mode)}</td><td>${hoursText(t.hours)}</td><td class="num">${money2(t.cost.eco)}</td></tr>`).join("");
 
     app.innerHTML = `
       ${posterHero({
-        kick: `<a href="#/${D.continent}">آسيا</a> ‹ <a href="${B()}">${D.flag} ${esc(D.name)}</a>`,
+        kick: `<a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ${T("‹", "›")} <a href="${B()}">${D.flag} ${esc(D.name)}</a>`,
         title: esc(c.name),
         lead: esc(c.summary),
         body: `<div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>`,
-        poster: { art: cityScene(c, true), wiki: cityWiki(c), title: c.short || c.name, caption: `${D.flag} ${esc(D.name)} · ${esc(c.region)}`, stamp: `${c.places.length}<br>مكان` },
+        poster: { art: cityScene(c, true), wiki: cityWiki(c), title: c.short || c.name, caption: `${D.flag} ${esc(D.name)} · ${esc(c.region)}`, stamp: `${c.places.length}<br>${T("مكان", "places")}` },
       })}
 
       <div class="wrap city-grid">
         <div>
           <section class="block">
-            <h2>وش تزور؟ <small class="count">${c.places.length} مكان</small></h2>
+            <h2>${T("وش تزور؟", "What to see")} <small class="count">${c.places.length} ${T("مكان", "places")}</small></h2>
             <div class="pgrid">${places}</div>
           </section>
 
           <section class="block">
-            <h2>كم بتصرف؟</h2>
+            <h2>${T("كم بتصرف؟", "What it costs")}</h2>
             <div class="table-wrap"><table>
               <thead><tr><th></th>${TIERS.map((t) => `<th>${D.tiers[t].name}</th>`).join("")}</tr></thead>
               <tbody>${tierRows}</tbody>
@@ -519,35 +530,35 @@
           </section>
 
           <section class="block">
-            <h2>وين تسكن؟</h2>
+            <h2>${T("وين تسكن؟", "Where to stay")}</h2>
             <div class="areas">${areas}</div>
           </section>
 
           <section class="block">
-            <h2>الأكل الحلال والمساجد</h2>
+            <h2>${T("الأكل الحلال والمساجد", "Halal food & mosques")}</h2>
             <div class="note">${mosques}<p style="margin:10px 0 0">${esc(c.halal.food)}</p>${src(c.halal.src, c.halal.date)}</div>
           </section>
 
           <section class="block">
-            <h2>التنقل</h2>
+            <h2>${T("التنقل", "Getting around")}</h2>
             <ul class="clean">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
-            <h3 style="margin-top:22px">أقرب الوجهات من ${esc(c.name)}</h3>
+            <h3 style="margin-top:22px">${T(`أقرب الوجهات من ${esc(c.name)}`, `Nearest stops from ${esc(c.name)}`)}</h3>
             <div class="table-wrap"><table>
-              <thead><tr><th>إلى</th><th>الطريقة</th><th>المدة</th><th>من (للشخص)</th></tr></thead>
+              <thead><tr><th>${T("إلى", "To")}</th><th>${T("الطريقة", "How")}</th><th>${T("المدة", "Time")}</th><th>${T("من (للشخص)", "From (per person)")}</th></tr></thead>
               <tbody>${near}</tbody>
             </table></div>
-            <p class="hint">المدد والأسعار تقديرية محسوبة من المسافة.</p>
+            <p class="hint">${T("المدد والأسعار تقديرية محسوبة من المسافة.", "Times and prices are estimates based on distance.")}</p>
           </section>
         </div>
 
         <aside class="facts">
           <dl>
-            <div><dt>أفضل وقت</dt><dd>${esc(c.bestTime)}</dd></div>
-            <div><dt>المدة المقترحة</dt><dd>${dayWord(c.days.ideal)}</dd></div>
-            <div><dt>السكن لليلة</dt><dd>من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}</dd></div>
-            <div><dt>أقرب مطار</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} بالطريق)`}</dd></div>
+            <div><dt>${T("أفضل وقت", "Best time")}</dt><dd>${esc(c.bestTime)}</dd></div>
+            <div><dt>${T("المدة المقترحة", "Suggested stay")}</dt><dd>${dayWord(c.days.ideal)}</dd></div>
+            <div><dt>${T("السكن لليلة", "Hotels per night")}</dt><dd>${T(`من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}`, `${money(c.costs.hotel.eco)} – ${money(c.costs.hotel.lux)}`)}</dd></div>
+            <div><dt>${T("أقرب مطار", "Nearest airport")}</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} ${T("بالطريق", "by road")})`}</dd></div>
           </dl>
-          <a class="btn no-print" href="${B()}/plan">كم تكفيني ميزانيتي؟</a>
+          <a class="btn no-print" href="${B()}/plan">${T("كم تكفيني ميزانيتي؟", "What will my budget cover?")}</a>
         </aside>
       </div>`;
     loadPhotos(app);
@@ -559,15 +570,15 @@
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
-          <h1 class="display">كل الأماكن</h1>
-          <p class="lead">${allPlaces.length} مكان في ${D.cities.length} وجهة. اضغط على أي مكان وشوف صورته وتفاصيله.</p>
+          <h1 class="display">${T("كل الأماكن", "All places")}</h1>
+          <p class="lead">${T(`${allPlaces.length} مكان في ${D.cities.length} وجهة. اضغط على أي مكان وشوف صورته وتفاصيله.`, `${allPlaces.length} places across ${D.cities.length} destinations. Tap any of them for photos and details.`)}</p>
         </div>
         <div class="filters">
-          <input type="search" id="fq" placeholder="ابحث عن مكان…" value="${esc(f.q)}" aria-label="بحث">
-          <select id="fc" aria-label="الوجهة"><option value="">كل الوجهات</option>${D.cities.map((c) => `<option value="${c.id}" ${f.city === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+          <input type="search" id="fq" placeholder="${T("ابحث عن مكان…", "Search places…")}" value="${esc(f.q)}" aria-label="${T("بحث", "Search")}">
+          <select id="fc" aria-label="${T("الوجهة", "Destination")}"><option value="">${T("كل الوجهات", "All destinations")}</option>${D.cities.map((c) => `<option value="${c.id}" ${f.city === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
           <div class="chips">
             ${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="ft" value="${k}" ${f.types.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}
-            <label class="chip"><input type="checkbox" id="ff" ${f.free ? "checked" : ""}><span>💸 مجانية فقط</span></label>
+            <label class="chip"><input type="checkbox" id="ff" ${f.free ? "checked" : ""}><span>💸 ${T("مجانية فقط", "Free only")}</span></label>
           </div>
         </div>
         <p class="count-line" id="fcount"></p>
@@ -587,7 +598,7 @@
         (!st.types.length || st.types.includes(p.type)) &&
         (!st.free || !p.fee) &&
         (!st.q || (p.name + p.desc + p.city.name).includes(st.q)));
-      document.getElementById("fcount").textContent = res.length ? `${res.length} مكان` : "ما لقينا أماكن بهالفلتر. جرّب تشيل بعض الخيارات.";
+      document.getElementById("fcount").textContent = res.length ? `${res.length} ${T("مكان", "places")}` : T("ما لقينا أماكن بهالفلتر. جرّب تشيل بعض الخيارات.", "Nothing matches these filters. Try removing a few.");
       list.innerHTML = res.map((p) => placeCard(p, { showCity: !st.city })).join("");
       loadPhotos(list);
     };
@@ -609,8 +620,8 @@
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
-          <h1 class="display">جهّز شنطتك</h1>
-          <p class="lead">كل اللي تحتاج تعرفه قبل السفر. أشّر على اللي خلصته، والقائمة تنحفظ على جهازك.</p>
+          <h1 class="display">${T("جهّز شنطتك", "Pack your bags")}</h1>
+          <p class="lead">${T("كل اللي تحتاج تعرفه قبل السفر. أشّر على اللي خلصته، والقائمة تنحفظ على جهازك.", "Everything to sort out before you fly. Tick items off — your list is saved on this device.")}</p>
         </div>
         <div class="progress"><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
         <div class="checklist">${blocks}</div>
@@ -618,10 +629,10 @@
     const paint = () => {
       const n = Object.values(done).filter(Boolean).length;
       document.getElementById("bar").style.width = (n / total) * 100 + "%";
-      document.getElementById("pct").textContent = `${n} من ${total}`;
+      document.getElementById("pct").textContent = `${n} ${T("من", "of")} ${total}`;
       D.before.forEach((b, bi) => {
         const c = b.points.filter((_, pi) => done[bi + "-" + pi]).length;
-        app.querySelector(`[data-count="${bi}"]`).textContent = c === b.points.length ? "تم ✓" : `${c} / ${b.points.length}`;
+        app.querySelector(`[data-count="${bi}"]`).textContent = c === b.points.length ? T("تم ✓", "Done ✓") : `${c} / ${b.points.length}`;
         app.querySelector(`[data-card="${bi}"]`).classList.toggle("done", c === b.points.length);
       });
     };
@@ -663,7 +674,7 @@
       const n = alloc.get(c);
       const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i }))
         .sort((a, b) => (interests.includes(b.type) ? 1 : 0) - (interests.includes(a.type) ? 1 : 0));
-      const slotsOf = (p) => (p.time.includes("يوم كامل") ? 2 : 1);
+      const slotsOf = (p) => (p.time.includes("يوم كامل") || p.time === "Full day" ? 2 : 1);
       const tr = ci > 0 ? travel(route[ci - 1], c) : null;
       if (tr) inter += tr.cost[tier];
       for (let d = 0; d < n; d++) {
@@ -672,7 +683,7 @@
         let slots = 2;
         const items = [];
         if (d === 0 && tr) slots = tr.hours > 5 ? 0 : tr.hours > 2.5 ? 1 : 1;
-        if (d === 0 && ci === 0) { items.push({ t: "الوصول والاستقرار في الفندق" }); slots = 1; }
+        if (d === 0 && ci === 0) { items.push({ t: T("الوصول والاستقرار في الفندق", "Arrive and check in"), k: "in" }); slots = 1; }
         if (last) slots = Math.min(slots, 1);
         while (slots > 0 && pool.length) {
           const k = pool.findIndex((p) => slotsOf(p) <= slots);
@@ -682,8 +693,8 @@
           fees += p.fee;
           items.push({ p });
         }
-        if (slots > 0 && !items.length) items.push({ t: "يوم حر: تسوق وراحة وتجربة أكل محلي" });
-        if (last) items.push({ t: "المغادرة" });
+        if (slots > 0 && !items.length) items.push({ t: T("يوم حر: تسوق وراحة وتجربة أكل محلي", "Free day: shopping, rest and local food"), k: "free" });
+        if (last) items.push({ t: T("المغادرة", "Departure"), k: "out" });
         plan.push({ day: dayNo, city: c, items, travel: d === 0 && tr ? { from: route[ci - 1], ...tr } : null, newCity: d === 0 });
         food += c.costs.food[tier];
         local += c.costs.transport[tier];
@@ -767,30 +778,30 @@
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
-          <h1 class="display">ميزانيتي</h1>
-          <p class="lead">اكتب كم معك، ونطلع لك كل الخيارات اللي تناسبك. غيّر أي شي والنتائج تتحدّث مباشرة.</p>
+          <h1 class="display">${T("ميزانيتي", "My budget")}</h1>
+          <p class="lead">${T("اكتب كم معك، ونطلع لك كل الخيارات اللي تناسبك. غيّر أي شي والنتائج تتحدّث مباشرة.", "Enter what you can spend and we'll lay out every trip that fits. Change anything — results update instantly.")}</p>
         </div>
         <div class="planner">
           <form class="form" id="planForm" onsubmit="return false">
             <div class="field">
-              <label for="budget">الميزانية الكاملة <output>${curName()}</output></label>
+              <label for="budget">${T("الميزانية الكاملة", "Total budget")} <output>${curName()}</output></label>
               <input class="money-in" id="budget" inputmode="numeric" value="${fmt(amount)}">
               <div class="chips" style="margin-top:10px">${presetsFor(currency).map((v) => `<button type="button" class="chip-btn" data-b="${v}">${fmt(v)}</button>`).join("")}</div>
             </div>
             <div class="field">
-              <label for="days">مدة الرحلة <output id="daysOut"></output></label>
+              <label for="days">${T("مدة الرحلة", "Trip length")} <output id="daysOut"></output></label>
               <input type="range" id="days" min="3" max="21" value="${s.days}">
             </div>
             <div class="field">
-              <label for="travelers">عدد المسافرين <output id="trOut"></output></label>
+              <label for="travelers">${T("عدد المسافرين", "Travellers")} <output id="trOut"></output></label>
               <input type="range" id="travelers" min="1" max="8" value="${s.travelers}">
             </div>
             <div class="field">
-              <span class="label">وش تحب؟ <small class="hint" style="margin:0">اختياري</small></span>
+              <span class="label">${T("وش تحب؟", "What do you enjoy?")} <small class="hint" style="margin:0">${T("اختياري", "optional")}</small></span>
               <div class="chips">${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="interest" value="${k}" ${s.interests.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}</div>
             </div>
             <div class="field">
-              <label class="toggle"><input type="checkbox" id="flights" ${s.flights ? "checked" : ""}><span>الميزانية تشمل تذاكر الطيران من السعودية <small>(تقدير ${money(D.flightSAR * D.currency.perSAR)} للشخص ذهاب وعودة)</small></span></label>
+              <label class="toggle"><input type="checkbox" id="flights" ${s.flights ? "checked" : ""}><span>${T("الميزانية تشمل تذاكر الطيران من السعودية", "Budget includes flights from Saudi Arabia")} <small>(${T(`تقدير ${money(D.flightSAR * D.currency.perSAR)} للشخص ذهاب وعودة`, `est. ${money(D.flightSAR * D.currency.perSAR)} return per person`)})</small></span></label>
             </div>
           </form>
           <div class="result" id="result"></div>
@@ -829,7 +840,7 @@
     const { fits, over } = buildOptions(s);
     lastOptions = fits.length ? fits : over.slice(0, 5);
     const resEl = document.getElementById("result");
-    if (s.budget <= 0) { resEl.innerHTML = `<div class="empty-state">اكتب ميزانيتك عشان نطلع لك الخيارات.</div>`; return; }
+    if (s.budget <= 0) { resEl.innerHTML = `<div class="empty-state">${T("اكتب ميزانيتك عشان نطلع لك الخيارات.", "Enter a budget to see your options.")}</div>`; return; }
 
     const optCard = (r, i, isOver) => {
       const left = s.budget - r.total;
@@ -838,13 +849,13 @@
         <article class="opt tkt ${isOver ? "over" : ""}">
           <div class="tkt-main">
             <div class="opt-art">${cityScene(r.route[0], true)}${photoOver(cityWiki(r.route[0]))}<span class="tier-badge t-${r.tier}">${D.tiers[r.tier].name}</span></div>
-            <h3>${r.route.map((c) => esc(c.short)).join(" ← ")}</h3>
+            <h3>${r.route.map((c) => esc(c.short)).join(` ${FWD} `)}</h3>
             <div class="stops">${chips}</div>
           </div>
           <button type="button" class="tkt-stub" data-opt="${i}">
-            <small>التكلفة</small><b>${money(r.total)}</b>
-            <em class="${isOver ? "neg" : ""}">${isOver ? "ينقصك" : "يبقى"} ${money(Math.abs(left))}</em>
-            <span class="see">شوف البرنامج</span>
+            <small>${T("التكلفة", "Total")}</small><b>${money(r.total)}</b>
+            <em class="${isOver ? "neg" : ""}">${isOver ? T("ينقصك", "Short") : T("يبقى", "Left")} ${money(Math.abs(left))}</em>
+            <span class="see">${T("شوف البرنامج", "See the plan")}</span>
           </button>
         </article>`;
     };
@@ -857,9 +868,9 @@
         <div class="dest-body">
           <h4>${esc(c.name)}</h4>
           <div class="dest-days">
-            <span class="${d.lux >= s.days ? "ok" : ""}">فاخر <b>${cap(d.lux)}</b></span>
-            <span class="${d.mid >= s.days ? "ok" : ""}">متوسط <b>${cap(d.mid)}</b></span>
-            <span class="${d.eco >= s.days ? "ok" : ""}">اقتصادي <b>${cap(d.eco)}</b></span>
+            <span class="${d.lux >= s.days ? "ok" : ""}">${D.tiers.lux.name} <b>${cap(d.lux)}</b></span>
+            <span class="${d.mid >= s.days ? "ok" : ""}">${D.tiers.mid.name} <b>${cap(d.mid)}</b></span>
+            <span class="${d.eco >= s.days ? "ok" : ""}">${D.tiers.eco.name} <b>${cap(d.eco)}</b></span>
           </div>
         </div>
       </a>`).join("");
@@ -867,15 +878,15 @@
     resEl.innerHTML = `
       <div class="summary-line">
         ${fits.length
-          ? `لقينا لك ${optWord(fits.length)} تناسب ميزانيتك ${money(s.budget)} لـ ${paxWord(s.travelers)} و${dayWord(s.days)}.`
-          : `ميزانيتك ${money(s.budget)} ما تكفي ${dayWord(s.days)} لـ ${paxWord(s.travelers)} في أي مسار. هذي أقرب الخيارات، أو قلّل الأيام.`}
-        <span class="hint">${s.flights ? "شامل تذاكر الطيران الدولي (تقدير)." : "بدون تذاكر الطيران الدولي."} شامل التأشيرة والسكن والأكل والتنقل والرسوم.</span>
+          ? T(`لقينا لك ${optWord(fits.length)} تناسب ميزانيتك ${money(s.budget)} لـ ${paxWord(s.travelers)} و${dayWord(s.days)}.`, `We found ${optWord(fits.length)} that fit your ${money(s.budget)} budget for ${paxWord(s.travelers)} over ${dayWord(s.days)}.`)
+          : T(`ميزانيتك ${money(s.budget)} ما تكفي ${dayWord(s.days)} لـ ${paxWord(s.travelers)} في أي مسار. هذي أقرب الخيارات، أو قلّل الأيام.`, `${money(s.budget)} doesn't stretch to ${dayWord(s.days)} for ${paxWord(s.travelers)} on any route. Here are the closest options — or try fewer days.`)}
+        <span class="hint">${s.flights ? T("شامل تذاكر الطيران الدولي (تقدير).", "Includes international flights (estimate).") : T("بدون تذاكر الطيران الدولي.", "Excludes international flights.")} ${T("شامل التأشيرة والسكن والأكل والتنقل والرسوم.", "Covers visa, hotels, food, transport and entry fees.")}</span>
       </div>
       <div class="opts">${lastOptions.map((r, i) => optCard(r, i, !fits.length)).join("")}</div>
 
       <section class="block" style="margin-top:44px">
-        <h2>كم يوم تكفيك ميزانيتك في كل وجهة؟</h2>
-        <p class="hint" style="margin-top:-6px">لو قعدت كل رحلتك في وجهة وحدة. الأخضر يغطي ${dayWord(s.days)} أو أكثر.</p>
+        <h2>${T("كم يوم تكفيك ميزانيتك في كل وجهة؟", "How many days your budget buys in each place")}</h2>
+        <p class="hint" style="margin-top:-6px">${T(`لو قعدت كل رحلتك في وجهة وحدة. الأخضر يغطي ${dayWord(s.days)} أو أكثر.`, `If you spent the whole trip in one place. Green means ${dayWord(s.days)} or more.`)}</p>
         <div class="dests">${destCards}</div>
       </section>`;
     loadPhotos(resEl);
@@ -887,29 +898,29 @@
     const p = r.parts;
     const sections = [];
     r.plan.forEach((d) => { if (d.newCity) sections.push({ city: d.city, travel: d.travel, days: [] }); sections[sections.length - 1].days.push(d); });
-    const noteIco = (t) => (t.startsWith("الوصول") ? "🛬" : t === "المغادرة" ? "🛫" : "☕");
+    const noteIco = (it) => (it.k === "in" ? "🛬" : it.k === "out" ? "🛫" : "☕");
     const days = sections.map((sec) => `
       <section class="leg">
-        ${sec.travel ? `<div class="leg-travel"><span class="lt-ico">${sec.travel.mode.includes("طيران") ? "✈️" : "🚐"}</span><span>من ${esc(sec.travel.from.short)} إلى ${esc(sec.city.short)}: ${esc(sec.travel.mode)}، ${hoursText(sec.travel.hours)}</span><b>${money(sec.travel.cost[r.tier])} للشخص</b></div>` : ""}
+        ${sec.travel ? `<div class="leg-travel"><span class="lt-ico">${sec.travel.flight ? "✈️" : "🚐"}</span><span>${T(`من ${esc(sec.travel.from.short)} إلى ${esc(sec.city.short)}: ${esc(sec.travel.mode)}، ${hoursText(sec.travel.hours)}`, `${esc(sec.travel.from.short)} to ${esc(sec.city.short)}: ${esc(sec.travel.mode)}, ${hoursText(sec.travel.hours)}`)}</span><b>${money(sec.travel.cost[r.tier])} ${T("للشخص", "pp")}</b></div>` : ""}
         <header class="leg-head">
           <div class="leg-art">${cityScene(sec.city, true)}</div>
-          <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}</span></div>
-          <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>عن الوجهة</a>
+          <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${T(`${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}`, `${dayWord(sec.days.length)} · day ${sec.days[0].day}${sec.days.length > 1 ? "–" + sec.days[sec.days.length - 1].day : ""}`)}</span></div>
+          <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>${T("عن الوجهة", "About")}</a>
         </header>
         ${sec.days.map((d) => `
           <div class="pday">
-            <div class="pday-n"><small>اليوم</small>${d.day}</div>
+            <div class="pday-n"><small>${T("اليوم", "Day")}</small>${d.day}</div>
             <div class="pday-items">${d.items.map((it) => it.p
-              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>${it.p.fee ? money(it.p.fee) : "مجانًا"} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">‹</span></button>`
-              : `<div class="prow note-row"><span class="note-ico">${noteIco(it.t)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
+              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
+              : `<div class="prow note-row"><span class="note-ico">${noteIco(it)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
           </div>`).join("")}
       </section>`).join("");
 
     dlg.innerHTML = `
       <div class="dlg-in wide">
-        <button type="button" class="dlg-x" data-close aria-label="إغلاق">✕</button>
+        <button type="button" class="dlg-x" data-close aria-label="${T("إغلاق", "Close")}">✕</button>
         <div class="pass">
-          <div class="pass-art">${cityScene(last, true)}<span class="ttl">بطاقة رحلتك</span></div>
+          <div class="pass-art">${cityScene(last, true)}<span class="ttl">${T("بطاقة رحلتك", "Your boarding pass")}</span></div>
           <div class="pass-main">
             <div class="pass-route">
               <div class="code">${esc(first.code || first.en)}<small>${esc(first.name)}</small></div>
@@ -917,38 +928,38 @@
               <div class="code">${esc(last.code || last.en)}<small>${esc(last.name)}</small></div>
             </div>
             <div class="pass-fields">
-              <div>المدة<b>${dayWord(s.days)}</b></div>
-              <div>المسافرون<b>${paxWord(s.travelers)}</b></div>
-              <div>المستوى<b>${D.tiers[r.tier].name}</b></div>
-              <div>المحطات<b>${r.route.length === 1 ? "وجهة وحدة" : r.route.length === 2 ? "وجهتين" : r.route.length + " وجهات"}</b></div>
+              <div>${T("المدة", "Length")}<b>${dayWord(s.days)}</b></div>
+              <div>${T("المسافرون", "Travellers")}<b>${paxWord(s.travelers)}</b></div>
+              <div>${T("المستوى", "Comfort")}<b>${D.tiers[r.tier].name}</b></div>
+              <div>${T("المحطات", "Stops")}<b>${EN_ON ? r.route.length + (r.route.length === 1 ? " stop" : " stops") : r.route.length === 1 ? "وجهة وحدة" : r.route.length === 2 ? "وجهتين" : r.route.length + " وجهات"}</b></div>
             </div>
           </div>
           <div class="pass-stub">
-            <div><div class="k">التكلفة التقريبية</div><div class="amount">${money(r.total)}</div><div class="k">${money(r.total / s.travelers)} للشخص</div></div>
+            <div><div class="k">${T("التكلفة التقريبية", "Estimated total")}</div><div class="amount">${money(r.total)}</div><div class="k">${money(r.total / s.travelers)} ${T("للشخص", "per person")}</div></div>
             <div class="barcode" aria-hidden="true"></div>
           </div>
         </div>
         <div class="costs">
-          <div>السكن<b>${money(p.hotel)}</b></div>
-          <div>الأكل<b>${money(p.food)}</b></div>
-          <div>التنقل الداخلي<b>${money(p.local)}</b></div>
-          <div>بين الوجهات<b>${money(p.inter)}</b></div>
-          <div>رسوم الأماكن<b>${money(p.fees)}</b></div>
-          <div>التأشيرة${s.flights ? " والطيران" : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
+          <div>${T("السكن", "Hotels")}<b>${money(p.hotel)}</b></div>
+          <div>${T("الأكل", "Food")}<b>${money(p.food)}</b></div>
+          <div>${T("التنقل الداخلي", "Local transport")}<b>${money(p.local)}</b></div>
+          <div>${T("بين الوجهات", "Between stops")}<b>${money(p.inter)}</b></div>
+          <div>${T("رسوم الأماكن", "Entry fees")}<b>${money(p.fees)}</b></div>
+          <div>${T("التأشيرة", "Visa")}${s.flights ? T(" والطيران", " & flights") : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
         </div>
-        <p class="hint">${D.tiers[r.tier].desc}. السكن محسوب غرفة لكل شخصين، والأسعار تقريبية ومصادرها في صفحة كل وجهة.</p>
+        <p class="hint">${D.tiers[r.tier].desc}. ${T("السكن محسوب غرفة لكل شخصين، والأسعار تقريبية ومصادرها في صفحة كل وجهة.", "Hotels assume one room per two travellers. Prices are estimates — sources are on each destination page.")}</p>
         <div class="trip">
           <div class="legs">${days}</div>
           <div class="map">${mapSVG(r.route, { animate: true })}</div>
         </div>
-        <div class="actions no-print"><button class="btn" type="button" onclick="window.print()">اطبع الخطة أو احفظها PDF</button></div>
+        <div class="actions no-print"><button class="btn" type="button" onclick="window.print()">${T("اطبع الخطة أو احفظها PDF", "Print or save as PDF")}</button></div>
       </div>`;
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     loadPhotos(dlg);
   }
 
   function viewNotFound() {
-    app.innerHTML = `<div class="wrap"><h1 class="display">الصفحة مو موجودة</h1><p><a href="#/">ارجع للرئيسية</a></p></div>`;
+    app.innerHTML = `<div class="wrap"><h1 class="display">${T("الصفحة مو موجودة", "Page not found")}</h1><p><a href="#/">${T("ارجع للرئيسية", "Back to home")}</a></p></div>`;
   }
 
   // ---------- عمق الطبقات مع التمرير ----------
@@ -1015,12 +1026,13 @@
     const C = inCountry ? D : last;
     const base = C ? "#/c/" + C.id : "#/asia";
     nav.innerHTML = `
-      <a href="#/" data-route="world" aria-label="القارات"><i>🌍</i>الوجهات</a>
+      <a href="#/" data-route="world" aria-label="${T("القارات", "Continents")}"><i>🌍</i>${T("الوجهات", "Explore")}</a>
       ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}"><i>${C.flag}</i>${esc(C.name)}</a>` : ""}
-      ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>ميزانيتي</a><a href="${base}/places" data-route="places"><i>📍</i>الأماكن</a><a href="${base}/before" data-route="before"><i>🧳</i>قبل السفر</a>` : ""}`;
+      ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>${T("ميزانيتي", "Budget")}</a><a href="${base}/places" data-route="places"><i>📍</i>${T("الأماكن", "Places")}</a><a href="${base}/before" data-route="before"><i>🧳</i>${T("قبل السفر", "Prep")}</a>` : ""}`;
     nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.route === page || (page === "city" && a.dataset.route === "country") || (page === "continent" && a.dataset.route === "world")));
     const loc = curBox.querySelector('[data-cur="LOCAL"]');
-    loc.textContent = C ? C.currency.name : "محلي";
+    loc.textContent = C ? C.currency.name : T("محلي", "Local");
+    curBox.querySelector('[data-cur="SAR"]').textContent = T("ريال", "SAR");
     curBox.style.display = inCountry ? "" : "none";
   }
 
@@ -1042,6 +1054,18 @@
     render();
     window.scrollTo({ top: y, behavior: "instant" });
   });
+
+  // زر اللغة
+  const langBtn = document.getElementById("langBtn");
+  if (langBtn) {
+    langBtn.textContent = EN_ON ? "ع" : "EN";
+    langBtn.setAttribute("aria-label", EN_ON ? "التبديل إلى العربية" : "Switch to English");
+    langBtn.addEventListener("click", () => { store.set("lang", EN_ON ? "ar" : "en"); location.reload(); });
+  }
+  const foot = document.getElementById("footText");
+  if (foot) foot.textContent = T("الأسعار تقريبية ومأخوذة من المصادر المذكورة جنب كل رقم، وتتغير مع الوقت. تأكد منها قبل الحجز.", "Prices are estimates drawn from the sources shown next to each figure, and they change over time. Always check before you book.");
+  document.title = T("رحّال: دليل السفر بالميزانية", "Wayfarer — travel planning that starts with your budget");
+  document.querySelectorAll(".brand-name").forEach((el) => (el.textContent = T("رحّال", "Wayfarer")));
 
   paintCurrency();
   window.addEventListener("hashchange", route);

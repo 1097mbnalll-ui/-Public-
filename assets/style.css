@@ -814,3 +814,16 @@ footer .logo { color: var(--gold); }
 .logo .logo-mark { width: 36px; height: 36px; flex-shrink: 0; transform: rotate(-45deg); }
 footer .logo { display: flex; align-items: center; font-size: 1.6rem; }
 footer .logo .logo-mark { width: 34px; height: 34px; }
+
+/* زر اللغة */
+.lang-btn { border: 1.5px solid var(--line); background: transparent; color: var(--ink); font: 600 .85rem "Readex Pro", sans-serif; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.lang-btn:hover { background: var(--gold); color: #12312f; border-color: var(--gold); }
+.pill { gap: 8px; }
+.pill .nav { margin-inline-start: auto; }
+/* الإنجليزي: اتجاه من اليسار */
+.lang-en .ticket .go::before { right: auto; left: -1px; border-right: 0; border-left: 3px dotted var(--cream); }
+.lang-en .logo .logo-mark { transform: rotate(45deg); }
+.lang-en .phero h1.display { letter-spacing: -0.01em; }
+.lang-en .display, .lang-en .poster h4, .lang-en .big-poster h2 { font-family: "Lalezar", sans-serif; }
+.lang-en .pass-route .line::after { transform: none; }
+.ticket .f:nth-child(3) { flex: 1.35; }
