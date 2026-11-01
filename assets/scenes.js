@@ -319,5 +319,69 @@
     return svg(id, body, defs, "كثبان رملية على البحر");
   }
 
-  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc, terraces, dunes };
+  // ---------- قباب ومآذن على الموية (إسطنبول، باكو، تبليسي) ----------
+  function domes() {
+    const id = uid();
+    const defs =
+      grad(id + "-sky", [[0, "#1e2a5e"], [0.45, "#7a4a86"], [0.8, "#f08a5d"], [1, "#ffd08a"]]) +
+      grad(id + "-sea", [[0, "#4a3c74"], [1, "#151538"]]);
+    const mosque = (cx, base, w, col) => {
+      const h = w * 0.55;
+      let g = `<rect x="${cx - w / 2}" y="${base - h * 0.45}" width="${w}" height="${h * 0.45}" fill="${col}"/>`;
+      g += `<path d="M${cx - w * 0.32},${base - h * 0.45} Q${cx - w * 0.32},${base - h * 1.25} ${cx},${base - h * 1.3} Q${cx + w * 0.32},${base - h * 1.25} ${cx + w * 0.32},${base - h * 0.45} Z" fill="${col}"/>`;
+      g += `<rect x="${cx - 1.2}" y="${base - h * 1.5}" width="2.4" height="${h * 0.22}" fill="${col}"/>`;
+      [-1, 1].forEach((sd) => {
+        g += `<path d="M${cx + sd * w * 0.38},${base - h * 0.45} Q${cx + sd * w * 0.38},${base - h * 0.85} ${cx + sd * w * 0.24},${base - h * 0.85} Q${cx + sd * w * 0.12},${base - h * 0.85} ${cx + sd * w * 0.12},${base - h * 0.45} Z" fill="${col}"/>`;
+        const mx = cx + sd * (w / 2 + 10);
+        g += `<rect x="${mx - 3}" y="${base - h * 1.9}" width="6" height="${h * 1.9}" fill="${col}"/><path d="M${mx - 3},${base - h * 1.9} L${mx},${base - h * 2.25} L${mx + 3},${base - h * 1.9} Z" fill="${col}"/><rect x="${mx - 5}" y="${base - h * 1.35}" width="10" height="3" fill="${col}"/>`;
+      });
+      return g;
+    };
+    const r = rng(5);
+    let city = "";
+    for (let x = 0; x < 800; ) { const w = 20 + r() * 34, h = 14 + r() * 26; city += `<rect x="${x}" y="${300 - h}" width="${w}" height="${h + 2}"/>`; x += w + 2; }
+    const refl = [0, 1, 2, 3, 4].map((i) => `<rect x="${560 - 50 + i * 8}" y="${318 + i * 14}" width="${100 - i * 16}" height="3" rx="1.5" fill="#ffd9a0" opacity="${0.7 - i * 0.12}"/>`).join("");
+    const body = `
+      <rect width="800" height="450" fill="url(#${id}-sky)"/>
+      <circle cx="560" cy="250" r="60" fill="#ffd9a0" opacity="0.45" filter="url(#${id}-glow)"/>
+      <circle cx="560" cy="250" r="34" fill="#ffe2b0"/>
+      ${birds("#3b2450")}
+      ${clouds(id, "#ffd6c0", [[180, 90, 1.1, 80], [640, 120, 0.8, 70]])}
+      <g data-depth="0.06" fill="#5a3f7a">${city}</g>
+      <g data-depth="0.12">${mosque(230, 300, 150, "#2c2050")}${mosque(470, 302, 110, "#33255a")}</g>
+      <rect y="300" width="800" height="150" fill="url(#${id}-sea)"/>
+      ${refl}
+      <g opacity="0.3" filter="url(#${id}-soft)" transform="translate(0 602) scale(1 -1)">${mosque(230, 300, 150, "#2c2050")}</g>
+      <g data-depth="0.22"><g transform="translate(640 372)" class="bob"><path d="M-50,0 L50,0 Q44,12 30,14 L-34,14 Q-46,10 -50,0 Z" fill="#1d1534"/><rect x="-24" y="-16" width="44" height="16" rx="3" fill="#f2f0f6"/><rect x="-18" y="-12" width="8" height="6" fill="#ffd08a"/><rect x="-4" y="-12" width="8" height="6" fill="#ffd08a"/><rect x="10" y="-12" width="6" height="6" fill="#ffd08a"/><rect x="-6" y="-26" width="6" height="10" fill="#c8323a"/></g></g>`;
+    return svg(id, body, defs, "قباب ومآذن على الموية وقت الغروب");
+  }
+
+  // ---------- بالونات كبادوكيا ----------
+  function balloons() {
+    const id = uid();
+    const defs =
+      grad(id + "-sky", [[0, "#5aa7d6"], [0.55, "#f6c7a5"], [1, "#ffe6c4"]]) +
+      grad(id + "-rock", [[0, "#f1cfa3"], [1, "#c98f5f"]]);
+    const cols = [["#e63946", "#ffd166"], ["#ff8c42", "#fff3d6"], ["#2a9d8f", "#e9c46a"], ["#7b5ea7", "#ffb4a2"], ["#f4a261", "#264653"], ["#ef476f", "#ffd166"]];
+    const balloon = (x, y, s, c, i) => `
+      <g class="float" style="--d:${i * 0.8}s"><g transform="translate(${x} ${y}) scale(${s})">
+        <path d="M0,-30 C22,-30 28,-8 18,10 C12,20 6,24 4,28 L-4,28 C-6,24 -12,20 -18,10 C-28,-8 -22,-30 0,-30 Z" fill="${c[0]}"/>
+        <path d="M0,-30 C8,-30 10,-8 6,10 C4,20 2,24 1.5,28 L-1.5,28 C-2,24 -4,20 -6,10 C-10,-8 -8,-30 0,-30 Z" fill="${c[1]}"/>
+        <line x1="-4" y1="28" x2="-3" y2="36" stroke="#5a3a24" stroke-width="0.8"/><line x1="4" y1="28" x2="3" y2="36" stroke="#5a3a24" stroke-width="0.8"/>
+        <rect x="-4" y="36" width="8" height="6" rx="1" fill="#6b4a2b"/>
+      </g></g>`;
+    const list = [[150, 110, 1.3], [300, 70, 0.8], [420, 150, 1.6], [560, 90, 1.0], [680, 160, 0.9], [230, 190, 0.7], [740, 60, 0.6], [80, 200, 0.6], [500, 220, 0.55]];
+    const chim = (x, base, w, h, col) => `<path d="M${x},${base} L${x + w * 0.15},${base - h} Q${x + w * 0.5},${base - h - w * 0.5} ${x + w * 0.85},${base - h} L${x + w},${base} Z" fill="${col}"/><ellipse cx="${x + w / 2}" cy="${base - h - w * 0.2}" rx="${w * 0.42}" ry="${w * 0.18}" fill="#8a5a3a"/>`;
+    const body = `
+      <rect width="800" height="450" fill="url(#${id}-sky)"/>
+      <circle cx="120" cy="300" r="70" fill="#fff0d0" opacity="0.6" filter="url(#${id}-glow)"/>
+      ${list.map(([x, y, s], i) => balloon(x, y, s, cols[i % cols.length], i)).join("")}
+      <g data-depth="0.06"><path d="M0,330 Q120,290 260,320 Q400,280 540,316 Q680,290 800,310 L800,450 L0,450 Z" fill="#e8b98a"/></g>
+      <g data-depth="0.14">${chim(60, 380, 50, 90, "#ddb084")}${chim(130, 384, 40, 60, "#d6a274")}${chim(560, 380, 56, 110, "#ddb084")}${chim(640, 386, 44, 70, "#d6a274")}${chim(720, 382, 50, 95, "#e2bb8f")}</g>
+      <g data-depth="0.22"><path d="M0,400 Q200,370 400,396 T800,390 L800,450 L0,450 Z" fill="url(#${id}-rock)"/>
+        <g fill="#7a4e30"><rect x="600" y="372" width="6" height="8" rx="3"/><rect x="616" y="368" width="6" height="8" rx="3"/></g></g>`;
+    return svg(id, body, defs, "بالونات فوق مداخن الجنيات");
+  }
+
+  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc, terraces, dunes, domes, balloons };
 })();

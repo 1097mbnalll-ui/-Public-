@@ -1,9 +1,21 @@
 (function () {
   "use strict";
 
-  const D = window.TRAVEL_DATA;
+  const W = window.WORLD;
   const app = document.getElementById("app");
-  const cityById = Object.fromEntries(D.cities.map((c) => [c.id, c]));
+  // الدولة الحالية: كل الدوال تقرا منها
+  let D = null, cityById = {}, allPlaces = [], placeByKey = {};
+  function setCountry(c) {
+    if (D && D.id === c.id) return;
+    D = { ...c, tiers: W.tiers, interests: W.interests, sources: { ...W.sources, ...(c.sources || {}) } };
+    cityById = Object.fromEntries(c.cities.map((x) => [x.id, x]));
+    allPlaces = c.cities.flatMap((x) => x.places.map((p, i) => ({ ...p, city: x, key: c.id + ":" + x.id + ":" + i })));
+    placeByKey = Object.fromEntries(allPlaces.map((p) => [p.key, p]));
+    travelCache.clear();
+    store.set("lastCountry", c.id);
+  }
+  var travelCache = new Map();
+  const B = () => "#/c/" + D.id;
   const TIERS = ["eco", "mid", "lux"];
   const ICONS = { history: "🏯", nature: "⛰️", beach: "🏖️", food: "🍜", fun: "🎡" };
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -14,28 +26,30 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* تجاهل */ } },
   };
   let currency = store.get("currency", "SAR");
+  if (currency === "VND") currency = "LOCAL";
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (n, digits = 0) => n.toLocaleString("en-US", { maximumFractionDigits: digits });
   const dayWord = (n) => (n === 1 ? "يوم" : n === 2 ? "يومين" : n <= 10 ? n + " أيام" : n + " يوم");
+  const optWord = (n) => (n === 1 ? "خيار واحد" : n === 2 ? "خيارين" : n <= 10 ? `<b>${n}</b> خيارات` : `<b>${n}</b> خيار`);
   const paxWord = (n) => (n === 1 ? "شخص" : n === 2 ? "شخصين" : n + " أشخاص");
-  const rate = (cur = currency) => (cur === "SAR" ? D.rates.VND_PER_SAR : cur === "USD" ? D.rates.VND_PER_USD : 1);
-  const curName = (cur = currency) => (cur === "SAR" ? "ريال" : cur === "USD" ? "دولار" : "دونق");
+  const rate = (cur = currency) => (cur === "SAR" ? D.currency.perSAR : cur === "USD" ? D.currency.perUSD : 1);
+  const curName = (cur = currency) => (cur === "SAR" ? "ريال" : cur === "USD" ? "دولار" : D.currency.name);
 
   function money(vnd, cur = currency) {
     if (vnd === 0) return "مجانًا";
-    if (cur === "VND") return fmt(Math.round(vnd / 1000) * 1000) + " دونق";
+    if (cur === "LOCAL") { const r = D.currency.round || 1; return fmt(Math.max(r, Math.round(vnd / r) * r)) + " " + D.currency.name; }
     if (cur === "USD") {
-      const v = vnd / D.rates.VND_PER_USD;
+      const v = vnd / D.currency.perUSD;
       return "$" + fmt(v < 20 ? Math.round(v * 2) / 2 : Math.round(v), 1);
     }
-    const v = vnd / D.rates.VND_PER_SAR;
+    const v = vnd / D.currency.perSAR;
     const r = v < 20 ? Math.round(v) : v < 500 ? Math.round(v / 5) * 5 : Math.round(v / 10) * 10;
     return fmt(Math.max(r, 1)) + " ريال";
   }
   function money2(vnd) {
-    if (vnd === 0 || currency === "VND") return money(vnd);
-    return `${money(vnd)}<span class="sub">${money(vnd, "VND")}</span>`;
+    if (vnd === 0 || currency === "LOCAL") return money(vnd);
+    return `${money(vnd)}<span class="sub">${money(vnd, "LOCAL")}</span>`;
   }
   function src(id, date, id2) {
     const links = [id, id2].filter(Boolean).map((i) => {
@@ -57,18 +71,18 @@
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(h)) * 1.3; // تقريب لمسافة الطريق
   }
-  const groundLeg = (d) => ({ hours: d / 45, mode: "باص أو سيارة", cost: { eco: Math.max(120000, d * 1300), mid: Math.max(250000, d * 2200), lux: Math.max(900000, d * 11000) } });
-  const flightLeg = (d) => ({ hours: 1 + d / 750, mode: "طيران", cost: { eco: 900000 + d * 700, mid: 1400000 + d * 1000, lux: 3000000 + d * 2000 } });
+  const U = (usd) => usd * D.currency.perUSD;
+  const groundLeg = (d, ferry) => ({ hours: d / 45 + (ferry ? 1 : 0), mode: ferry ? "عبّارة أو سيارة" : "باص أو سيارة", cost: { eco: U(Math.max(5, d * 0.05)), mid: U(Math.max(10, d * 0.085)), lux: U(Math.max(35, d * 0.42)) } });
+  const flightLeg = (d) => ({ hours: 1 + d / 750, mode: "طيران", cost: { eco: U(35 + d * 0.027), mid: U(55 + d * 0.038), lux: U(115 + d * 0.076) } });
   const hubOf = (c) => (c.code ? c : cityById[c.hub]);
 
-  const travelCache = new Map();
   function travel(a, b) {
-    const key = a.id + ">" + b.id;
+    const key = D.id + a.id + ">" + b.id;
     if (travelCache.has(key)) return travelCache.get(key);
     const d = km(a, b);
     let res;
     if (d <= 380) {
-      const g = groundLeg(d);
+      const g = groundLeg(d, (a.island || b.island) && a.hub !== b.id && b.hub !== a.id);
       res = { mode: g.mode, hours: g.hours, cost: g.cost };
     } else {
       const ha = hubOf(a), hb = hubOf(b);
@@ -90,7 +104,13 @@
   // ---------- الخريطة ----------
   const OUTLINE = "M82.5,5 L117.5,15 L135,37.5 L150,50 L117.5,67.5 L100,90 L95,120 L112.5,140 L115,150 L140,175 L155,185 L172.5,210 L180,242.5 L182.5,260 L180,282.5 L180,290 L175,300 L152.5,315 L127.5,328.75 L117.5,345 L70,372.5 L70,350 L62.5,327.5 L77.5,315 L105,312.5 L110,295 L137.5,280 L140,250 L137.5,220 L140,202.5 L130,182.5 L112.5,172.5 L100,152.5 L90,132.5 L62.5,117.5 L50,105 L67.5,90 L30,72.5 L25,50 L5,30 L12.5,20 L37.5,22.5 L57.5,17.5 Z";
   const ISLAND = "M45,326 Q52,322 53,330 Q52,340 46,338 Q42,332 45,326 Z";
-  const XY = (c) => ({ x: (c.lon - 102) * 25, y: (23.5 - c.lat) * 25 });
+  function XY(c) {
+    if (D.id === "vietnam") return { x: (c.lon - 102) * 25, y: (23.5 - c.lat) * 25 };
+    const lons = D.cities.map((x) => x.lon), lats = D.cities.map((x) => x.lat);
+    const lo = Math.min(...lons), la = Math.max(...lats);
+    const sc = Math.min(220 / Math.max(0.5, Math.max(...lons) - lo), 340 / Math.max(0.5, la - Math.min(...lats)));
+    return { x: 10 + (c.lon - lo) * sc, y: 20 + (la - c.lat) * sc };
+  }
   let mapId = 0;
   function mapSVG(stops, { animate = false } = {}) {
     const id = "m" + ++mapId;
@@ -108,8 +128,8 @@
         (active ? `<text x="${left ? p.x - 8 : p.x + 8}" y="${p.y + 4}" text-anchor="${left ? "end" : "start"}">${esc(c.short)}</text>` : "");
     }).join("");
     return `
-      <svg viewBox="-60 0 300 380" role="img" aria-label="خريطة فيتنام ومسار الرحلة">
-        <path class="land" d="${OUTLINE}"/><path class="land" d="${ISLAND}"/>
+      <svg viewBox="-60 0 300 380" role="img" aria-label="خريطة ${esc(D.name)} ومسار الرحلة">
+        ${D.id === "vietnam" ? `<path class="land" d="${OUTLINE}"/><path class="land" d="${ISLAND}"/>` : `<rect class="land" x="-10" y="0" width="260" height="380" rx="24" opacity="0.6"/>`}
         ${stops.length > 1 ? `<mask id="${id}"><path class="reveal ${animate ? "draw" : ""}" d="${d}" pathLength="1" style="--len:1"/></mask><path class="route" d="${d}" mask="url(#${id})"/>` : ""}
         ${dots}
       </svg>`;
@@ -166,8 +186,7 @@
   }
 
   // ---------- بطاقة المكان ونافذة التفاصيل ----------
-  const allPlaces = D.cities.flatMap((c) => c.places.map((p, i) => ({ ...p, city: c, key: c.id + ":" + i })));
-  const placeByKey = Object.fromEntries(allPlaces.map((p) => [p.key, p]));
+
 
   function placeCard(p, { showCity = false } = {}) {
     return `
@@ -219,7 +238,7 @@
         <button type="button" class="dlg-x" data-close aria-label="إغلاق">✕</button>
         <div class="dlg-ph ${big ? "" : "empty"}">${big ? `<img src="${esc(big)}" alt="${esc(p.name)}">` : `<span class="ph-ico">${ICONS[p.type] || "📍"}</span>`}</div>
         <div class="dlg-body">
-          <a class="pcard-city" href="#/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
+          <a class="pcard-city" href="${B()}/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
           <h2>${esc(p.name)}</h2>
           <div class="about">
             <p class="about-desc">${esc(p.desc)}</p>
@@ -244,15 +263,129 @@
   });
 
   // ---------- مدخل الميزانية ----------
-  const DEFAULT = { budget: 6000 * D.rates.VND_PER_SAR, days: 7, travelers: 2, interests: [], flights: false };
-  const getPlan = () => ({ ...DEFAULT, ...store.get("budgetPlan", {}) });
-  const presetsFor = (cur) => (cur === "SAR" ? [3000, 5000, 8000, 12000, 20000] : cur === "USD" ? [800, 1500, 2000, 3000, 5000] : [20e6, 35e6, 55e6, 80e6, 130e6]);
+  const DEFAULT = { budgetSAR: 6000, days: 7, travelers: 2, interests: [], flights: false };
+  const getPlan = () => { const p = { ...DEFAULT, ...store.get("budgetPlanSAR", {}) }; p.budget = p.budgetSAR * (D ? D.currency.perSAR : 1); return p; };
+  const savePlan = (p) => { const { budget, ...rest } = p; store.set("budgetPlanSAR", { ...rest, budgetSAR: budget / D.currency.perSAR }); };
+  const presetsFor = (cur) => (cur === "SAR" ? [3000, 5000, 8000, 12000, 20000] : cur === "USD" ? [800, 1500, 2000, 3000, 5000] : [3000, 5000, 8000, 12000, 20000].map((v) => { const x = v * D.currency.perSAR; const m = 10 ** Math.floor(Math.log10(x)); return Math.round(x / m) * m; }));
+
+
+  // ---------- الصفحة الرئيسية: القارات ----------
+  const readyIn = (cont) => Object.values(W.countries).filter((c) => c.continent === cont);
+  function viewWorld() {
+    const cards = W.continents.map((k) => {
+      const n = readyIn(k.id).length;
+      return `
+      <a class="postcard ${k.open ? "" : "soon"}" ${k.open ? `href="#/${k.id}"` : 'aria-disabled="true"'}>
+        <div class="art">${scene(k.scene)}</div>
+        <span class="stamp">${k.open ? `${n} دول` : "قريبًا"}</span>
+        <div class="body">
+          <h3>${esc(k.name)}</h3>
+          <p>${esc(k.blurb)}</p>
+          <div class="foot"><span>${k.open ? "تصفح الدول" : "نشتغل عليها"}</span><b>${k.open ? "←" : ""}</b></div>
+        </div>
+      </a>`;
+    }).join("");
+    app.innerHTML = `
+      <section class="hero">
+        <div class="art">${scene("domes")}</div>
+        <div class="wrap hero-in">
+          <h1 class="display">وين نروح؟</h1>
+          <p class="lead">دليلك العربي للسفر: اكتب ميزانيتك، ونقولك وين تقدر تروح، وكم يوم، وكم بيبقى معك.</p>
+          <form class="budget-box" id="worldBudget">
+            <label for="wb">ميزانيتي</label>
+            <input id="wb" inputmode="numeric" value="${fmt(Math.round(getPlan().budgetSAR))}">
+            <span>ريال</span>
+            <button class="btn" type="submit">وين تكفيني؟</button>
+          </form>
+        </div>
+      </section>
+      <div class="wrap">
+        <section class="band">
+          <div class="band-head"><div><h2 class="display">اختر قارتك</h2><p>بدأنا بآسيا، والقارات الباقية جاية.</p></div></div>
+          <div class="continents">${cards}</div>
+        </section>
+      </div>`;
+    document.getElementById("worldBudget").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = parseFloat(document.getElementById("wb").value.replace(/[^\d.]/g, ""));
+      if (v > 0) store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), budgetSAR: v });
+      location.hash = "#/asia";
+    });
+  }
+
+  // ---------- صفحة القارة: الدول ووين تكفي الميزانية ----------
+  function viewContinent(cid) {
+    const k = W.continents.find((x) => x.id === cid);
+    if (!k || !k.open) return viewNotFound();
+    const list = W[cid] || [];
+    const st = { ...DEFAULT, ...store.get("budgetPlanSAR", {}) };
+    app.innerHTML = `
+      <div class="wrap">
+        <div class="page-title">
+          <div class="crumbs dark"><a href="#/">القارات</a></div>
+          <h1 class="display">${esc(k.name)}</h1>
+          <p class="lead">${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.</p>
+        </div>
+        <form class="fit-form" id="fitForm" onsubmit="return false">
+          <label>ميزانيتي <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ريال</label>
+          <label>لمدة <select id="fd">${[4, 5, 7, 10, 14].map((d) => `<option ${d === st.days ? "selected" : ""} value="${d}">${dayWord(d)}</option>`).join("")}</select></label>
+          <label>لـ <select id="ft">${[1, 2, 3, 4, 5, 6].map((d) => `<option ${d === st.travelers ? "selected" : ""} value="${d}">${paxWord(d)}</option>`).join("")}</select></label>
+          <label class="toggle-inline"><input type="checkbox" id="ff" ${st.flights ? "checked" : ""}> شامل الطيران</label>
+        </form>
+        <div id="fit"></div>
+        <section class="band">
+          <div class="band-head"><div><h2 class="display">كل الدول</h2></div></div>
+          <div class="countries">${list.map((c) => {
+            const ready = !!W.countries[c.id];
+            const C = W.countries[c.id];
+            return `<a class="country ${ready ? "" : "soon"}" ${ready ? `href="#/c/${c.id}"` : 'aria-disabled="true"'}>
+              <span class="flag">${c.flag}</span><span class="cn">${esc(c.name)}</span>
+              <span class="cs">${ready ? `${C.cities.length} وجهة · ${C.cities.reduce((a, x) => a + x.places.length, 0)} مكان` : "قريبًا"}</span></a>`;
+          }).join("")}</div>
+        </section>
+      </div>`;
+    const form = document.getElementById("fitForm");
+    const fit = document.getElementById("fit");
+    const update = () => {
+      const s2 = {
+        budgetSAR: parseFloat(document.getElementById("fb").value.replace(/[^\d.]/g, "")) || 0,
+        days: +document.getElementById("fd").value, travelers: +document.getElementById("ft").value,
+        flights: document.getElementById("ff").checked,
+      };
+      store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...s2 });
+      const prev = D;
+      const rows = readyIn(cid).map((C) => {
+        setCountry(C);
+        const s = { ...DEFAULT, ...s2, interests: [], budget: s2.budgetSAR * C.currency.perSAR };
+        const { fits, over } = buildOptions(s);
+        const best = fits[0] || over[0];
+        return { C, fits: fits.length, best, total: best ? best.total / C.currency.perSAR : 0, ok: !!fits.length, route: best ? best.route.map((x) => x.short).join(" ← ") : "", tier: best ? best.tier : "" };
+      });
+      if (prev) setCountry(prev);
+      rows.sort((a, b) => (b.ok - a.ok) || (b.fits - a.fits) || (a.total - b.total));
+      const sar = (v) => fmt(Math.round(v / 10) * 10) + " ريال";
+      fit.innerHTML = `
+        <div class="fits">${rows.map((r) => `
+          <a class="fit ${r.ok ? "" : "over"}" href="#/c/${r.C.id}/plan">
+            <div class="fit-art">${scene(r.C.scene, true)}<span class="flag-big">${r.C.flag}</span></div>
+            <div class="fit-body">
+              <h3>${esc(r.C.name)}</h3>
+              <p>${r.ok ? `${optWord(r.fits)} تناسبك، أفضلها <b>${esc(W.tiers[r.tier].name)}</b>` : `ميزانيتك ما تكفي ${dayWord(s2.days)}`}</p>
+              <div class="fit-route">${esc(r.route)}</div>
+              <div class="fit-foot"><span>${r.ok ? "يبقى معك" : "ينقصك"}</span><b class="${r.ok ? "pos" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
+            </div>
+          </a>`).join("")}</div>`;
+    };
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+    update();
+  }
 
   // ---------- الرئيسية ----------
-  function viewHome() {
+  function viewCountry() {
     const plan = getPlan();
     const cards = D.cities.map((c) => `
-      <a class="postcard" href="#/city/${c.id}">
+      <a class="postcard" href="${B()}/city/${c.id}">
         <div class="art">${cityScene(c)}</div>
         <span class="stamp">${esc(c.code || c.region)}<small>${c.code ? esc(c.region) : ""}</small></span>
         <div class="body">
@@ -262,14 +395,15 @@
         </div>
       </a>`).join("");
 
-    const picks = ["Golden Bridge (Vietnam)", "Hạ Long Bay", "Tràng An", "Hội An", "Imperial City of Huế", "Fansipan", "Paradise Cave (Vietnam)", "Bến Thành Market"]
-      .map((w) => allPlaces.find((p) => p.wiki === w)).filter(Boolean);
+    const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
 
     app.innerHTML = `
       <section class="hero">
-        <div class="art">${scene("halong")}</div>
+        <div class="art">${scene(D.scene)}</div>
         <div class="wrap hero-in">
-          <h1 class="display">كم ميزانيتك لفيتنام؟</h1>
+          <div class="crumbs"><a href="#/${D.continent}">آسيا</a> ‹ ${D.flag} ${esc(D.name)}</div>
+          <h1 class="display">كم ميزانيتك ل${esc(D.name)}؟</h1>
+          <div class="tags" style="margin:0 0 10px"><span class="tag">🛂 ${esc(D.visaNote)}</span><span class="tag">💵 ${esc(D.currency.name)}</span></div>
           <p class="lead">اكتب ميزانيتك، ونطلع لك عشرات الخيارات من ${D.cities.length} وجهة و${allPlaces.length} مكان، بالأيام والتكلفة.</p>
           <form class="budget-box" id="heroBudget">
             <label for="hb">ميزانيتي</label>
@@ -299,15 +433,15 @@
         <section class="band">
           <div class="band-head">
             <div><h2 class="display">أماكن لازم تشوفها</h2><p>اضغط على أي مكان وشوف صورته وتفاصيله.</p></div>
-            <a class="btn ghost" href="#/places">كل الأماكن (${allPlaces.length})</a>
+            <a class="btn ghost" href="${B()}/places">كل الأماكن (${allPlaces.length})</a>
           </div>
           <div class="pgrid">${picks.map((p) => placeCard(p, { showCity: true })).join("")}</div>
         </section>
 
         <section class="band">
           <div class="tiles">
-            <a class="tile" href="#/before"><div class="ico">🧳</div><h3>قائمة التجهيز</h3><p>التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.</p></a>
-            <a class="tile" href="#/city/hcmc"><div class="ico">🕌</div><h3>أكل حلال ومساجد</h3><p>في كل وجهة قسم للمطاعم الحلال والمساجد القريبة.</p></a>
+            <a class="tile" href="${B()}/before"><div class="ico">🧳</div><h3>قائمة التجهيز</h3><p>التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.</p></a>
+            <a class="tile" href="${B()}/places"><div class="ico">🕌</div><h3>أكل حلال ومساجد</h3><p>في كل وجهة قسم للمطاعم الحلال والمساجد القريبة.</p></a>
             <div class="tile"><div class="ico">🔎</div><h3>كل رقم له مصدر</h3><p>جنب كل سعر مصدره وتاريخ آخر تحقق منه.</p></div>
           </div>
         </section>
@@ -316,8 +450,8 @@
     document.getElementById("heroBudget").addEventListener("submit", (e) => {
       e.preventDefault();
       const v = parseFloat(document.getElementById("hb").value.replace(/[^\d.]/g, ""));
-      if (v > 0) store.set("budgetPlan", { ...getPlan(), budget: v * rate() });
-      location.hash = "#/plan";
+      if (v > 0) savePlan({ ...getPlan(), budget: v * rate() });
+      location.hash = B() + "/plan";
     });
     const cardsEl = document.getElementById("cards");
     app.querySelectorAll(".arrows button").forEach((b) => b.addEventListener("click", () => {
@@ -344,13 +478,13 @@
       ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
       : `<p>ما فيه مساجد معروفة قريبة للسياح.</p>`;
     const near = D.cities.filter((o) => o !== c).map((o) => ({ o, t: travel(c, o) })).sort((a, b) => a.t.hours - b.t.hours).slice(0, 6)
-      .map(({ o, t }) => `<tr><td><a href="#/city/${o.id}">${esc(o.name)}</a></td><td>${esc(t.mode)}</td><td>${hoursText(t.hours)}</td><td class="num">${money2(t.cost.eco)}</td></tr>`).join("");
+      .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td>${esc(t.mode)}</td><td>${hoursText(t.hours)}</td><td class="num">${money2(t.cost.eco)}</td></tr>`).join("");
 
     app.innerHTML = `
       <section class="hero city-hero">
         <div class="art">${cityScene(c)}</div>
         <div class="wrap hero-in">
-          <div class="crumbs"><a href="#/">الرئيسية</a></div>
+          <div class="crumbs"><a href="#/${D.continent}">آسيا</a> ‹ <a href="${B()}">${D.flag} ${esc(D.name)}</a></div>
           <h1 class="display">${esc(c.name)}</h1>
           <p class="lead">${esc(c.summary)}</p>
           <div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>
@@ -403,7 +537,7 @@
             <div><dt>السكن لليلة</dt><dd>من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}</dd></div>
             <div><dt>أقرب مطار</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} بالطريق)`}</dd></div>
           </dl>
-          <a class="btn no-print" href="#/plan">كم تكفيني ميزانيتي؟</a>
+          <a class="btn no-print" href="${B()}/plan">كم تكفيني ميزانيتي؟</a>
         </aside>
       </div>`;
     loadPhotos(app);
@@ -548,12 +682,12 @@
     });
     const parts = {
       hotel, food: food * travelers, local: local * travelers, fees: fees * travelers, inter: inter * travelers,
-      visa: 25 * D.rates.VND_PER_USD * travelers,
+      visa: D.visaSAR * D.currency.perSAR * travelers,
       flights: 0,
     };
     return { route, alloc, plan, parts, tier };
   }
-  const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.intlFlight.vnd * travelers : 0);
+  const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.flightSAR * D.currency.perSAR * travelers : 0);
 
   function candidates(days, interests) {
     const k = Math.max(1, Math.min(6, Math.round(days / 3)));
@@ -585,16 +719,16 @@
     const budget = s.budget;
     const fits = [], over = [];
     for (const route of candidates(s.days, s.interests)) {
-      let chosen = null, cheapest = null;
+      // كل مستوى يناسب الميزانية خيار مستقل
+      let cheapest = null, any = false;
       for (const tier of ["lux", "mid", "eco"]) {
         const r = planRoute(route, { ...s, tier });
         if (!r) break;
         r.total = totalOf(r, s.flights, s.travelers);
         if (tier === "eco") cheapest = r;
-        if (!chosen && r.total <= budget) chosen = r;
+        if (r.total <= budget) { fits.push(r); any = true; }
       }
-      if (chosen) fits.push(chosen);
-      else if (cheapest) over.push(cheapest);
+      if (!any && cheapest) over.push(cheapest);
     }
     const tierRank = { lux: 3, mid: 2, eco: 1 };
     const value = (r) => r.route.reduce((a, c) => a + score(c, s.interests) * r.alloc.get(c), 0) / s.days + tierRank[r.tier] * 1.2 + r.route.length * 0.15;
@@ -608,7 +742,7 @@
     const rooms = Math.ceil(s.travelers / 2);
     const avgFee = c.places.slice(0, 6).reduce((a, p) => a + p.fee, 0) / 6;
     const entry = c.code ? 0 : groundLeg(c.hubKm).cost.mid * s.travelers;
-    const fixed = 25 * D.rates.VND_PER_USD * s.travelers + (s.flights ? D.intlFlight.vnd * s.travelers : 0) + entry;
+    const fixed = D.visaSAR * D.currency.perSAR * s.travelers + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0) + entry;
     return Object.fromEntries(TIERS.map((t) => {
       const daily = c.costs.hotel[t] * rooms + s.travelers * (c.costs.food[t] + c.costs.transport[t] + avgFee);
       return [t, Math.max(0, Math.floor((s.budget - fixed) / daily))];
@@ -646,7 +780,7 @@
               <div class="chips">${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="interest" value="${k}" ${s.interests.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}</div>
             </div>
             <div class="field">
-              <label class="toggle"><input type="checkbox" id="flights" ${s.flights ? "checked" : ""}><span>الميزانية تشمل تذاكر الطيران من السعودية <small>(تقدير ${money(D.intlFlight.vnd)} للشخص ذهاب وعودة)</small></span></label>
+              <label class="toggle"><input type="checkbox" id="flights" ${s.flights ? "checked" : ""}><span>الميزانية تشمل تذاكر الطيران من السعودية <small>(تقدير ${money(D.flightSAR * D.currency.perSAR)} للشخص ذهاب وعودة)</small></span></label>
             </div>
           </form>
           <div class="result" id="result"></div>
@@ -668,7 +802,7 @@
       const st = read();
       document.getElementById("daysOut").textContent = dayWord(st.days);
       document.getElementById("trOut").textContent = paxWord(st.travelers);
-      store.set("budgetPlan", st);
+      savePlan(st);
       clearTimeout(timer);
       resEl.classList.add("updating");
       timer = setTimeout(() => { renderOptions(st); resEl.classList.remove("updating"); }, now ? 0 : 160);
@@ -708,7 +842,7 @@
     const affordable = D.cities.map((c) => ({ c, d: daysAffordable(c, s) })).sort((a, b) => b.d.mid - a.d.mid);
     const cap = (n) => (n > 60 ? "+60" : n);
     const destCards = affordable.map(({ c, d }) => `
-      <a class="dest" href="#/city/${c.id}">
+      <a class="dest" href="${B()}/city/${c.id}">
         <div class="dest-art">${cityScene(c, true)}</div>
         <div class="dest-body">
           <h4>${esc(c.name)}</h4>
@@ -723,7 +857,7 @@
     resEl.innerHTML = `
       <div class="summary-line">
         ${fits.length
-          ? `لقينا لك <b>${fits.length}</b> خيار يناسب ميزانيتك ${money(s.budget)} لـ ${paxWord(s.travelers)} و${dayWord(s.days)}.`
+          ? `لقينا لك ${optWord(fits.length)} تناسب ميزانيتك ${money(s.budget)} لـ ${paxWord(s.travelers)} و${dayWord(s.days)}.`
           : `ميزانيتك ${money(s.budget)} ما تكفي ${dayWord(s.days)} لـ ${paxWord(s.travelers)} في أي مسار. هذي أقرب الخيارات، أو قلّل الأيام.`}
         <span class="hint">${s.flights ? "شامل تذاكر الطيران الدولي (تقدير)." : "بدون تذاكر الطيران الدولي."} شامل التأشيرة والسكن والأكل والتنقل والرسوم.</span>
       </div>
@@ -749,7 +883,7 @@
         <header class="leg-head">
           <div class="leg-art">${cityScene(sec.city, true)}</div>
           <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}</span></div>
-          <a class="leg-link" href="#/city/${sec.city.id}" data-close>عن الوجهة</a>
+          <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>عن الوجهة</a>
         </header>
         ${sec.days.map((d) => `
           <div class="pday">
@@ -789,7 +923,7 @@
           <div>التنقل الداخلي<b>${money(p.local)}</b></div>
           <div>بين الوجهات<b>${money(p.inter)}</b></div>
           <div>رسوم الأماكن<b>${money(p.fees)}</b></div>
-          <div>التأشيرة${s.flights ? " والطيران" : ""}<b>${money(p.visa + (s.flights ? D.intlFlight.vnd * s.travelers : 0))}</b></div>
+          <div>التأشيرة${s.flights ? " والطيران" : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
         </div>
         <p class="hint">${D.tiers[r.tier].desc}. السكن محسوب غرفة لكل شخصين، والأسعار تقريبية ومصادرها في صفحة كل وجهة.</p>
         <div class="trip">
@@ -828,17 +962,27 @@
   // ---------- التوجيه ----------
   function render() {
     const h = location.hash.replace(/^#\/?/, "");
-    const [page, arg] = h.split("/");
-    document.body.className = "page-" + (page || "home");
-    document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === (page || "home")));
+    let parts = h.split("/").filter(Boolean);
+    // روابط قديمة بدون دولة تروح لفيتنام
+    if (["city", "plan", "places", "before"].includes(parts[0])) parts = ["c", "vietnam", ...parts];
     if (pdlg.open) pdlg.close();
     if (dlg.open) dlg.close();
-    if (!page) viewHome();
-    else if (page === "city") viewCity(arg);
-    else if (page === "places") viewPlaces();
-    else if (page === "before") viewBefore();
-    else if (page === "plan") viewPlan(+arg);
+    let page = "world";
+    if (!parts.length) viewWorld();
+    else if (parts[0] === "c" && W.countries[parts[1]]) {
+      setCountry(W.countries[parts[1]]);
+      const [, , sub, arg] = parts;
+      page = sub || "country";
+      if (!sub) viewCountry();
+      else if (sub === "city") viewCity(arg);
+      else if (sub === "places") viewPlaces();
+      else if (sub === "before") viewBefore();
+      else if (sub === "plan") viewPlan(+arg);
+      else viewNotFound();
+    } else if (W.continents.some((k) => k.id === parts[0])) { page = "continent"; viewContinent(parts[0]); }
     else viewNotFound();
+    document.body.className = "page-" + (page === "country" || page === "world" || page === "city" ? (page === "city" ? "city" : "home") : page);
+    paintNav(page, parts[0] === "c");
     if (reduced) document.querySelectorAll("svg.scene").forEach((s) => s.pauseAnimations && s.pauseAnimations());
   }
   function route() {
@@ -852,6 +996,22 @@
     e.preventDefault();
     document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   });
+
+  // ---------- الشريط ----------
+  function paintNav(page, inCountry) {
+    const nav = document.getElementById("nav");
+    const last = W.countries[store.get("lastCountry", "")] || null;
+    const C = inCountry ? D : last;
+    const base = C ? "#/c/" + C.id : "#/asia";
+    nav.innerHTML = `
+      <a href="#/" data-route="world" aria-label="القارات">🌍<span class="nl"> الوجهات</span></a>
+      ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}">${C.flag}<span class="nl"> ${esc(C.name)}</span></a>` : ""}
+      ${C ? `<a href="${base}/plan" data-route="plan">ميزانيتي</a><a href="${base}/places" data-route="places">الأماكن</a><a href="${base}/before" data-route="before">قبل السفر</a>` : ""}`;
+    nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.route === page || (page === "city" && a.dataset.route === "country") || (page === "continent" && a.dataset.route === "world")));
+    const loc = curBox.querySelector('[data-cur="LOCAL"]');
+    loc.textContent = C ? C.currency.name : "محلي";
+    curBox.style.display = inCountry ? "" : "none";
+  }
 
   // ---------- العملة ----------
   const curBox = document.getElementById("currency");

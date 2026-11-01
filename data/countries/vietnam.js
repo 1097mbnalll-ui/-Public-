@@ -5,7 +5,8 @@
   أي سعر أو معلومة لازم يكون لها "src" (رقم المصدر من قائمة sources) و "date" (تاريخ آخر تحقق).
   لإضافة مكان: انسخ أي عنصر من places وعدّله.
 */
-window.TRAVEL_DATA = {
+(function () {
+const VN = {
   country: {
     id: "vietnam",
     name: "فيتنام",
@@ -269,7 +270,7 @@ window.TRAVEL_DATA = {
     },
 
     {
-      id: "phuquoc", short: "فو كوك",
+      id: "phuquoc", island: true, short: "فو كوك",
       lat: 10.22, lon: 103.96,
       code: "PQC",
       scene: "phuquoc",
@@ -568,7 +569,7 @@ window.TRAVEL_DATA = {
     },
 
     {
-      id: "condao", short: "كون داو", name: "كون داو", en: "Con Dao", region: "الجنوب", emoji: "🐢",
+      id: "condao", island: true, short: "كون داو", name: "كون داو", en: "Con Dao", region: "الجنوب", emoji: "🐢",
       lat: 8.68, lon: 106.6, code: "VCS", scene: "phuquoc",
       summary: "أرخبيل بكر بعيد: شواطئ خالية وسلاحف بحرية وغابات، وتاريخ سجون الحرب.",
       interests: { beach: 3, nature: 3, history: 2, food: 0, fun: 0 },
@@ -676,3 +677,15 @@ window.TRAVEL_DATA = {
     },
   ],
 };
+
+addCountry({
+  id: "vietnam", name: "فيتنام", flag: "🇻🇳", continent: "asia", scene: "halong",
+  tagline: VN.country.tagline,
+  currency: { code: "VND", name: "دونق", perSAR: VN.rates.VND_PER_SAR, perUSD: VN.rates.VND_PER_USD, round: 1000, date: VN.rates.date },
+  visaSAR: 94, visaNote: "تأشيرة إلكترونية 25 دولار",
+  flightSAR: 3000,
+  sources: VN.sources,
+  cities: VN.cities,
+  before: VN.before,
+});
+})();
