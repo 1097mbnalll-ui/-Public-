@@ -478,3 +478,63 @@ footer .logo { color: #fff; padding: 0; margin-bottom: 6px; }
 .linkish { all: unset; cursor: pointer; color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
 .linkish:hover { text-decoration-color: var(--coral); }
 .dlg-in.wide .trip { margin-top: 20px; }
+
+/* ---------- ملخص المكان ---------- */
+.about { display: grid; gap: 10px; margin-bottom: 14px; }
+.about-desc { margin: 0; font-size: 0.98rem; color: var(--muted); }
+.about-wiki { display: none; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; }
+.about.has-wiki .about-wiki { display: block; }
+.about-label { display: block; font-size: 0.78rem; color: var(--coral); font-weight: 500; margin-bottom: 4px; }
+.about-wiki p { margin: 0; font-size: 0.93rem; line-height: 1.85; color: var(--ink); }
+.place-dlg .dlg-body { max-height: none; }
+.place-dlg { overflow-y: auto; }
+
+/* ---------- عرض الخطة ---------- */
+.dlg-in.wide { font-size: 0.92rem; }
+.dlg-in.wide .pass-art { height: 96px; }
+.dlg-in.wide .pass-main { padding: 16px 18px; }
+.dlg-in.wide .pass-route .code { font-size: 1.8rem; }
+.dlg-in.wide .pass-fields b { font-size: 0.95rem; }
+.dlg-in.wide .pass-stub .amount { font-size: 1.9rem; }
+.dlg-in.wide .costs div { padding: 8px 12px; font-size: 0.8rem; }
+.dlg-in.wide .costs b { font-size: 0.98rem; }
+.dlg-in.wide .trip { grid-template-columns: minmax(0, 1fr) 190px; }
+
+.legs { display: grid; gap: 18px; }
+.leg { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.leg-head { position: relative; display: flex; align-items: flex-end; gap: 12px; min-height: 84px; padding: 12px 16px; color: #fff; isolation: isolate; }
+.leg-art { position: absolute; inset: 0; z-index: -2; }
+.leg-head::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(18,14,40,.75), rgba(18,14,40,.1)); }
+.leg-title { flex: 1; display: flex; flex-direction: column; line-height: 1.4; }
+.leg-title b { font-family: "Lalezar", sans-serif; font-weight: 400; font-size: 1.45rem; }
+.leg-title span { font-size: 0.82rem; opacity: .9; }
+.leg-link { color: #fff; font-size: 0.8rem; background: rgba(255,255,255,.18); padding: 3px 12px; border-radius: 999px; text-decoration: none; backdrop-filter: blur(6px); }
+.leg-travel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 16px; background: color-mix(in srgb, var(--coral) 10%, var(--surface)); color: var(--ink); font-size: 0.84rem; border-bottom: 1px solid var(--line); }
+.leg-travel b { margin-inline-start: auto; color: var(--coral); font-weight: 600; }
+.lt-ico { font-size: 1rem; }
+
+.pday { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 12px 14px; border-top: 1px dashed var(--line); }
+.leg-head + .pday { border-top: 0; }
+.pday-n { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 52px; border-radius: 14px; background: var(--surface-2); font-weight: 600; font-size: 1.15rem; line-height: 1.1; }
+.pday-n small { font-size: 0.66rem; font-weight: 400; color: var(--muted); }
+.pday-items { display: grid; gap: 8px; }
+.prow { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 76px minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 6px; border-radius: 14px; cursor: pointer; transition: background .2s var(--ease); }
+button.prow:hover { background: var(--surface-2); }
+button.prow:focus-visible { outline: 3px solid var(--gold); }
+.prow .ph { aspect-ratio: 4 / 3; border-radius: 10px; width: 76px; }
+.prow .ph-ico { font-size: 1.3rem; }
+.prow-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.prow-t b { font-weight: 500; font-size: 0.93rem; line-height: 1.5; }
+.prow-t small { color: var(--muted); font-size: 0.78rem; }
+.prow-go { color: var(--muted); font-size: 1.2rem; }
+.note-row { grid-template-columns: 76px minmax(0, 1fr); cursor: default; color: var(--muted); font-size: 0.86rem; padding-block: 2px; }
+.note-ico { display: grid; place-items: center; width: 76px; font-size: 1.1rem; }
+@media (max-width: 560px) {
+  .pday { grid-template-columns: 1fr; gap: 6px; }
+  .pday-n { flex-direction: row; gap: 6px; height: auto; padding: 4px 10px; width: fit-content; font-size: 0.95rem; }
+  .pday-n small { font-size: 0.8rem; }
+  .prow { grid-template-columns: 64px minmax(0, 1fr) 12px; }
+  .prow .ph, .note-ico { width: 64px; }
+  .note-row { grid-template-columns: 64px minmax(0, 1fr); }
+  .dlg-in.wide { padding: 12px; }
+}

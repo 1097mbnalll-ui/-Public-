@@ -186,6 +186,27 @@
   dlg.className = "place-dlg";
   document.body.appendChild(dlg);
   dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+  const pdlg = document.createElement("dialog");
+  pdlg.className = "place-dlg";
+  document.body.appendChild(pdlg);
+  pdlg.addEventListener("click", (e) => { if (e.target === pdlg || e.target.closest("[data-close]")) pdlg.close(); });
+
+  // ملخص المكان من ويكيبيديا العربية (لو موجود)
+  const sumCache = {};
+  async function fetchSummary(info, el) {
+    if (!info || !info.ar || !el) return;
+    let txt = sumCache[info.ar];
+    if (txt === undefined) {
+      try {
+        const u = "https://ar.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro=1&explaintext=1&exsentences=4&redirects=1&titles=" + encodeURIComponent(info.ar);
+        const j = await (await fetch(u)).json();
+        const pg = Object.values((j.query || {}).pages || {})[0] || {};
+        txt = (pg.extract || "").trim();
+      } catch (e) { txt = ""; }
+      sumCache[info.ar] = txt;
+    }
+    if (txt) { el.textContent = txt; el.closest(".about").classList.add("has-wiki"); }
+  }
 
   function openPlace(key) {
     const p = placeByKey[key];
@@ -193,14 +214,17 @@
     const info = photoCache[p.wiki] || {};
     const big = info.src ? info.src.replace(/\/\d+px-/, "/1280px-") : "";
     const wikiLink = info.ar ? `https://ar.wikipedia.org/wiki/${encodeURIComponent(info.ar)}` : p.wiki ? `https://en.wikipedia.org/wiki/${encodeURIComponent(info.title || p.wiki)}` : "";
-    dlg.innerHTML = `
+    pdlg.innerHTML = `
       <div class="dlg-in">
         <button type="button" class="dlg-x" data-close aria-label="إغلاق">✕</button>
         <div class="dlg-ph ${big ? "" : "empty"}">${big ? `<img src="${esc(big)}" alt="${esc(p.name)}">` : `<span class="ph-ico">${ICONS[p.type] || "📍"}</span>`}</div>
         <div class="dlg-body">
           <a class="pcard-city" href="#/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
           <h2>${esc(p.name)}</h2>
-          <p>${esc(p.desc)}</p>
+          <div class="about">
+            <p class="about-desc">${esc(p.desc)}</p>
+            <div class="about-wiki"><span class="about-label">نبذة من ويكيبيديا</span><p id="wikiSum"></p></div>
+          </div>
           <div class="dlg-facts">
             <div>الدخول<b>${p.fee ? money(p.fee) : "مجانًا"}</b></div>
             <div>الوقت المقترح<b>${esc(p.time)}</b></div>
@@ -211,7 +235,8 @@
           ${src(p.src, p.date)}
         </div>
       </div>`;
-    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    if (typeof pdlg.showModal === "function") pdlg.showModal(); else pdlg.setAttribute("open", "");
+    fetchSummary(info, pdlg.querySelector("#wikiSum"));
   }
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-place]");
@@ -715,17 +740,25 @@
   function openOption(r, s) {
     const first = r.route[0], last = r.route[r.route.length - 1];
     const p = r.parts;
-    const days = r.plan.map((d) => `
-      <li class="tl-day ${d.newCity ? "new-city" : ""}">
-        <span class="badge">${d.day}</span>
-        <div class="tl-card">
-          <div class="in">
-            <div class="where">${d.city.emoji} ${esc(d.city.name)}</div>
-            ${d.travel ? `<div class="travel">✈ من ${esc(d.travel.from.name)}: ${esc(d.travel.mode)} (${hoursText(d.travel.hours)})</div>` : ""}
-            <ul>${d.items.map((it) => it.p ? `<li><button type="button" class="linkish" data-place="${it.p.key}">${esc(it.p.name)}</button>${it.p.fee ? ` <small>(${money(it.p.fee)})</small>` : ""}</li>` : `<li>${esc(it.t)}</li>`).join("")}</ul>
-          </div>
-        </div>
-      </li>`).join("");
+    const sections = [];
+    r.plan.forEach((d) => { if (d.newCity) sections.push({ city: d.city, travel: d.travel, days: [] }); sections[sections.length - 1].days.push(d); });
+    const noteIco = (t) => (t.startsWith("الوصول") ? "🛬" : t === "المغادرة" ? "🛫" : "☕");
+    const days = sections.map((sec) => `
+      <section class="leg">
+        ${sec.travel ? `<div class="leg-travel"><span class="lt-ico">${sec.travel.mode.includes("طيران") ? "✈️" : "🚐"}</span><span>من ${esc(sec.travel.from.short)} إلى ${esc(sec.city.short)}: ${esc(sec.travel.mode)}، ${hoursText(sec.travel.hours)}</span><b>${money(sec.travel.cost[r.tier])} للشخص</b></div>` : ""}
+        <header class="leg-head">
+          <div class="leg-art">${cityScene(sec.city, true)}</div>
+          <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}</span></div>
+          <a class="leg-link" href="#/city/${sec.city.id}" data-close>عن الوجهة</a>
+        </header>
+        ${sec.days.map((d) => `
+          <div class="pday">
+            <div class="pday-n"><small>اليوم</small>${d.day}</div>
+            <div class="pday-items">${d.items.map((it) => it.p
+              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>${it.p.fee ? money(it.p.fee) : "مجانًا"} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">‹</span></button>`
+              : `<div class="prow note-row"><span class="note-ico">${noteIco(it.t)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
+          </div>`).join("")}
+      </section>`).join("");
 
     dlg.innerHTML = `
       <div class="dlg-in wide">
@@ -760,12 +793,13 @@
         </div>
         <p class="hint">${D.tiers[r.tier].desc}. السكن محسوب غرفة لكل شخصين، والأسعار تقريبية ومصادرها في صفحة كل وجهة.</p>
         <div class="trip">
-          <ol class="timeline">${days}</ol>
+          <div class="legs">${days}</div>
           <div class="map">${mapSVG(r.route, { animate: true })}</div>
         </div>
         <div class="actions no-print"><button class="btn" type="button" onclick="window.print()">اطبع الخطة أو احفظها PDF</button></div>
       </div>`;
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    loadPhotos(dlg);
   }
 
   function viewNotFound() {
@@ -787,6 +821,7 @@
     const [page, arg] = h.split("/");
     document.body.className = "page-" + (page || "home");
     document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === (page || "home")));
+    if (pdlg.open) pdlg.close();
     if (dlg.open) dlg.close();
     if (!page) viewHome();
     else if (page === "city") viewCity(arg);
