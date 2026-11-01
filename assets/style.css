@@ -808,3 +808,9 @@ footer .logo { color: var(--gold); }
   .pill { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0f3d3e; }
   .topbar { transition: none; }
 }
+
+/* شعار رحّال: طائرة من نقاط */
+.logo { font-family: "Marhey", "Lalezar", sans-serif; font-weight: 700; gap: 8px; color: var(--gold); }
+.logo .logo-mark { width: 36px; height: 36px; flex-shrink: 0; transform: rotate(-45deg); }
+footer .logo { display: flex; align-items: center; font-size: 1.6rem; }
+footer .logo .logo-mark { width: 34px; height: 34px; }
