@@ -260,5 +260,64 @@
     return svg(id, body, defs, "فو كوك: نخيل وبحر وتلفريك");
   }
 
-  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc };
+  // ---------- جبال ومدرجات أرز (سابا، ها جيانغ، دا لات) ----------
+  function terraces() {
+    const id = uid();
+    const defs =
+      grad(id + "-sky", [[0, "#7cc4dc"], [0.6, "#cfe9e6"], [1, "#f6ecc9"]]) +
+      grad(id + "-mist", [[0, "#ffffff", 0], [1, "#ffffff", 0.85]]);
+    const ridge = (base, amp, f, ph) => {
+      let d = `M0,450 L0,${base}`;
+      for (let x = 0; x <= 800; x += 20) d += ` L${x},${(base - Math.sin(x / f + ph) * amp - Math.sin(x / (f * 0.37) + ph * 2) * amp * 0.3).toFixed(1)}`;
+      return d + " L800,450 Z";
+    };
+    const greens = ["#86b94f", "#74a843", "#98c75e", "#6b9c3c", "#a9d06c"];
+    let bands = "";
+    for (let i = 0; i < 12; i++) {
+      const base = 250 + i * 19;
+      let top = "", bottom = "";
+      for (let x = 0; x <= 800; x += 16) {
+        const y = base + Math.sin(x / 110 + i * 0.45) * 16 + (x / 800) * 30;
+        top += `${x === 0 ? "M" : " L"}${x},${y.toFixed(1)}`;
+      }
+      bands += `<path d="${top} L800,450 L0,450 Z" fill="${greens[i % 5]}"/><path d="${top}" fill="none" stroke="#d9efa8" stroke-width="2" opacity="0.8"/>`;
+    }
+    const body = `
+      <rect width="800" height="450" fill="url(#${id}-sky)"/>
+      <circle cx="170" cy="90" r="40" fill="#fff8d6" opacity="0.8" filter="url(#${id}-glow)"/>
+      ${clouds(id, "#ffffff", [[520, 80, 1.3, 90], [260, 140, 1, 70]])}
+      ${birds("#43606a")}
+      <g data-depth="0.05"><path d="${ridge(170, 40, 140, 0.5)}" fill="#7d9fb0"/></g>
+      <g data-depth="0.09"><path d="${ridge(210, 34, 100, 2)}" fill="#5f8a8a"/></g>
+      <rect y="170" width="800" height="90" fill="url(#${id}-mist)" opacity="0.7"/>
+      <g data-depth="0.16">${bands}
+        <g fill="#5a3a24"><path d="M600,300 l18,-14 l18,14 Z"/><rect x="604" y="300" width="28" height="14"/><path d="M660,322 l14,-11 l14,11 Z"/><rect x="663" y="322" width="22" height="11"/></g>
+      </g>`;
+    return svg(id, body, defs, "مدرجات أرز بين الجبال");
+  }
+
+  // ---------- كثبان (موي ني) ----------
+  function dunes() {
+    const id = uid();
+    const defs =
+      grad(id + "-sky", [[0, "#f7a76c"], [0.55, "#ffd9a0"], [1, "#fff3dc"]]) +
+      grad(id + "-d1", [[0, "#f6d199"], [1, "#e7b26e"]]) +
+      grad(id + "-d2", [[0, "#efbd78"], [1, "#d4934c"]]);
+    const body = `
+      <rect width="800" height="450" fill="url(#${id}-sky)"/>
+      <circle cx="600" cy="200" r="70" fill="#fff0c8" opacity="0.6" filter="url(#${id}-glow)"/>
+      <circle cx="600" cy="200" r="42" fill="#fff6dc"/>
+      ${birds("#8a5a3a")}
+      <rect y="250" width="800" height="40" fill="#3fb3b6"/>
+      <rect y="250" width="800" height="4" fill="#ffffff" opacity="0.6"/>
+      <g data-depth="0.08"><path d="M0,300 Q150,230 330,280 Q480,230 640,270 Q720,250 800,262 L800,450 L0,450 Z" fill="url(#${id}-d1)"/></g>
+      <g data-depth="0.18">
+        <path d="M0,360 Q200,280 420,340 Q600,300 800,330 L800,450 L0,450 Z" fill="url(#${id}-d2)"/>
+        <path d="M0,360 Q200,280 420,340" fill="none" stroke="#fff1d0" stroke-width="2.5" opacity="0.7"/>
+        <g fill="#b8793c" opacity="0.6">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<ellipse cx="${300 + i * 26}" cy="${372 + (i % 2) * 6 - i * 2}" rx="4" ry="2"/>`).join("")}</g>
+      </g>`;
+    return svg(id, body, defs, "كثبان رملية على البحر");
+  }
+
+  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc, terraces, dunes };
 })();
