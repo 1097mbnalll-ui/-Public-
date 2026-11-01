@@ -269,48 +269,82 @@
   const presetsFor = (cur) => (cur === "SAR" ? [3000, 5000, 8000, 12000, 20000] : cur === "USD" ? [800, 1500, 2000, 3000, 5000] : [3000, 5000, 8000, 12000, 20000].map((v) => { const x = v * D.currency.perSAR; const m = 10 ** Math.floor(Math.log10(x)); return Math.round(x / m) * m; }));
 
 
+  // ---------- عناصر الملصقات ----------
+  const TILT = [-2, 1.5, -1, 2, -1.5, 1, -2.5, 0.8];
+  const tilt = (i) => TILT[i % TILT.length];
+  const cityWiki = (c) => c.wiki || c.en.split(" & ")[0];
+  // صورة حقيقية فوق الرسمة: تظهر لما تتحمّل من ويكيبيديا
+  const photoOver = (wiki) => (wiki ? `<div class="ph ph-cover" data-wiki="${esc(wiki)}"></div>` : "");
+  function posterCard({ href, art, wiki, flag, title, left, right, i = 0, soon }) {
+    return `
+      <a class="poster ${soon ? "soon" : ""}" ${href ? `href="${href}"` : 'aria-disabled="true"'} style="--r:${tilt(i)}deg">
+        ${flag ? `<span class="fl">${flag}</span>` : ""}
+        <div class="art">${art}${photoOver(wiki)}</div>
+        <h4>${esc(title)}</h4>
+        <div class="meta"><span>${left || ""}</span><b>${right || ""}</b></div>
+      </a>`;
+  }
+  function posterHero({ kick, title, sub, lead, body, poster }) {
+    return `
+      <section class="phero">
+        <div class="rays-wrap" aria-hidden="true"><div class="rays"></div></div>
+        <div class="wrap phero-in">
+          <div class="phero-text hero-in">
+            ${kick ? `<div class="kick">${kick}</div>` : ""}
+            <h1 class="display">${title}${sub ? `<span>${sub}</span>` : ""}</h1>
+            ${lead ? `<p class="lead">${lead}</p>` : ""}
+            ${body || ""}
+          </div>
+          ${poster ? `
+          <div class="big-poster">
+            <div class="art">${poster.art}${photoOver(poster.wiki)}</div>
+            <h2>${esc(poster.title)}</h2>
+            <p>${poster.caption}</p>
+            ${poster.stamp ? `<span class="stampc">${poster.stamp}</span>` : ""}
+          </div>` : ""}
+        </div>
+      </section>`;
+  }
+  const selectOpts = (arr, cur, word) => arr.map((d) => `<option ${d === cur ? "selected" : ""} value="${d}">${word(d)}</option>`).join("");
+  function ticketForm(id, { amount, unit, days, travelers, go }) {
+    return `
+      <form class="ticket" id="${id}">
+        <label class="f"><small>الميزانية (${unit})</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="الميزانية"></label>
+        <label class="f"><small>المدة</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], days, dayWord)}</select></label>
+        <label class="f"><small>المسافرين</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], travelers, paxWord)}</select></label>
+        <button class="go" type="submit">${go} ←</button>
+      </form>`;
+  }
+  const readTicket = (f) => ({ b: parseFloat(f.b.value.replace(/[^\d.]/g, "")) || 0, d: +f.d.value, t: +f.t.value });
+
   // ---------- الصفحة الرئيسية: القارات ----------
   const readyIn = (cont) => Object.values(W.countries).filter((c) => c.continent === cont);
   function viewWorld() {
-    const cards = W.continents.map((k) => {
-      const n = readyIn(k.id).length;
-      return `
-      <a class="postcard ${k.open ? "" : "soon"}" ${k.open ? `href="#/${k.id}"` : 'aria-disabled="true"'}>
-        <div class="art">${scene(k.scene)}</div>
-        <span class="stamp">${k.open ? `${n} دول` : "قريبًا"}</span>
-        <div class="body">
-          <h3>${esc(k.name)}</h3>
-          <p>${esc(k.blurb)}</p>
-          <div class="foot"><span>${k.open ? "تصفح الدول" : "نشتغل عليها"}</span><b>${k.open ? "←" : ""}</b></div>
-        </div>
-      </a>`;
-    }).join("");
-    app.innerHTML = `
-      <section class="hero">
-        <div class="art">${scene("domes")}</div>
-        <div class="wrap hero-in">
-          <h1 class="display">وين نروح؟</h1>
-          <p class="lead">دليلك العربي للسفر: اكتب ميزانيتك، ونقولك وين تقدر تروح، وكم يوم، وكم بيبقى معك.</p>
-          <form class="budget-box" id="worldBudget">
-            <label for="wb">ميزانيتي</label>
-            <input id="wb" inputmode="numeric" value="${fmt(Math.round(getPlan().budgetSAR))}">
-            <span>ريال</span>
-            <button class="btn" type="submit">وين تكفيني؟</button>
-          </form>
-        </div>
-      </section>
+    const st = getPlan();
+    const cards = W.continents.map((k, i) => posterCard({
+      href: k.open ? `#/${k.id}` : "", soon: !k.open, art: scene(k.scene, true), i,
+      title: k.name, left: esc(k.blurb), right: k.open ? `${readyIn(k.id).length} دول جاهزة` : "قريبًا",
+    })).join("");
+    app.innerHTML = posterHero({
+      kick: "🌏 دليلك العربي للسفر",
+      title: "ميزانيتك", sub: "توديك وين؟",
+      lead: "اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.",
+      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: "ريال", days: st.days, travelers: st.travelers, go: "وين تكفيني؟" }),
+      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: "كبادوكيا", caption: "🇹🇷 تركيا · بالونات الشروق", stamp: "آسيا<br>7 دول<br>جاهزة" },
+    }) + `
       <div class="wrap">
         <section class="band">
           <div class="band-head"><div><h2 class="display">اختر قارتك</h2><p>بدأنا بآسيا، والقارات الباقية جاية.</p></div></div>
-          <div class="continents">${cards}</div>
+          <div class="posters">${cards}</div>
         </section>
       </div>`;
     document.getElementById("worldBudget").addEventListener("submit", (e) => {
       e.preventDefault();
-      const v = parseFloat(document.getElementById("wb").value.replace(/[^\d.]/g, ""));
-      if (v > 0) store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), budgetSAR: v });
+      const t = readTicket(e.target);
+      store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t });
       location.hash = "#/asia";
     });
+    loadPhotos(app);
   }
 
   // ---------- صفحة القارة: الدول ووين تكفي الميزانية ----------
@@ -322,8 +356,8 @@
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
-          <div class="crumbs dark"><a href="#/">القارات</a></div>
-          <h1 class="display">${esc(k.name)}</h1>
+          <div class="kick"><a href="#/">القارات</a> ‹ ${esc(k.name)}</div>
+          <h1 class="display">${esc(k.name)} <span class="gold">بانتظارك</span></h1>
           <p class="lead">${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.</p>
         </div>
         <form class="fit-form" id="fitForm" onsubmit="return false">
@@ -365,15 +399,14 @@
       rows.sort((a, b) => (b.ok - a.ok) || (b.fits - a.fits) || (a.total - b.total));
       const sar = (v) => fmt(Math.round(v / 10) * 10) + " ريال";
       fit.innerHTML = `
-        <div class="fits">${rows.map((r) => `
-          <a class="fit ${r.ok ? "" : "over"}" href="#/c/${r.C.id}/plan">
-            <div class="fit-art">${scene(r.C.scene, true)}<span class="flag-big">${r.C.flag}</span></div>
-            <div class="fit-body">
-              <h3>${esc(r.C.name)}</h3>
-              <p>${r.ok ? `${optWord(r.fits)} تناسبك، أفضلها <b>${esc(W.tiers[r.tier].name)}</b>` : `ميزانيتك ما تكفي ${dayWord(s2.days)}`}</p>
-              <div class="fit-route">${esc(r.route)}</div>
-              <div class="fit-foot"><span>${r.ok ? "يبقى معك" : "ينقصك"}</span><b class="${r.ok ? "pos" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
-            </div>
+        <div class="sec-h"><h2 class="display">${rows.some((r) => r.ok) ? "تكفيك ميزانيتك في…" : "أقرب الدول لميزانيتك"}</h2><p>مرتبة من الأنسب لك</p></div>
+        <div class="posters">${rows.map((r, i) => `
+          <a class="poster ${r.ok ? "" : "over"}" href="#/c/${r.C.id}/plan" style="--r:${tilt(i)}deg">
+            <span class="fl">${r.C.flag}</span>
+            <div class="art">${scene(r.C.scene, true)}</div>
+            <h4>${esc(r.C.name)}</h4>
+            <p class="pline">${r.ok ? `${optWord(r.fits)} · أفضلها ${esc(W.tiers[r.tier].name)}` : `ما تكفي ${dayWord(s2.days)}`}<br><small>${esc(r.route)}</small></p>
+            <div class="meta"><span>${r.ok ? "يبقى معك" : "ينقصك"}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
           </a>`).join("")}</div>`;
     };
     form.addEventListener("input", update);
@@ -384,50 +417,34 @@
   // ---------- الرئيسية ----------
   function viewCountry() {
     const plan = getPlan();
-    const cards = D.cities.map((c) => `
-      <a class="postcard" href="${B()}/city/${c.id}">
-        <div class="art">${cityScene(c)}</div>
-        <span class="stamp">${esc(c.code || c.region)}<small>${c.code ? esc(c.region) : ""}</small></span>
-        <div class="body">
-          <h3>${esc(c.name)}</h3>
-          <p>${esc(c.summary)}</p>
-          <div class="foot"><span>${c.places.length} مكان</span><span>السكن من <b>${money(c.costs.hotel.eco)}</b></span></div>
-        </div>
-      </a>`).join("");
+    const cards = D.cities.map((c, i) => posterCard({
+      href: `${B()}/city/${c.id}`, art: cityScene(c, true), wiki: cityWiki(c), flag: c.emoji, i,
+      title: c.name, left: `${c.places.length} مكان · ${dayWord(c.days.ideal)}`, right: `من ${money(c.costs.hotel.eco)}`,
+    })).join("");
 
     const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
 
-    app.innerHTML = `
-      <section class="hero">
-        <div class="art">${scene(D.scene)}</div>
-        <div class="wrap hero-in">
-          <div class="crumbs"><a href="#/${D.continent}">آسيا</a> ‹ ${D.flag} ${esc(D.name)}</div>
-          <h1 class="display">كم ميزانيتك ل${esc(D.name)}؟</h1>
-          <div class="tags" style="margin:0 0 10px"><span class="tag">🛂 ${esc(D.visaNote)}</span><span class="tag">💵 ${esc(D.currency.name)}</span></div>
-          <p class="lead">اكتب ميزانيتك، ونطلع لك عشرات الخيارات من ${D.cities.length} وجهة و${allPlaces.length} مكان، بالأيام والتكلفة.</p>
-          <form class="budget-box" id="heroBudget">
-            <label for="hb">ميزانيتي</label>
-            <input id="hb" inputmode="numeric" value="${fmt(Math.round(plan.budget / rate()))}" aria-describedby="hbc">
-            <span id="hbc">${curName()}</span>
-            <button class="btn" type="submit">وريني الخيارات</button>
-          </form>
-          <div class="actions"><a class="btn glass" href="#cities" data-scroll>أو تصفح الوجهات</a></div>
+    const top = D.cities[0];
+    app.innerHTML = posterHero({
+      kick: `<a href="#/${D.continent}">آسيا</a> ‹ ${D.flag}`,
+      title: esc(D.name),
+      lead: esc(D.tagline),
+      body: `
+        <div class="paper prep">
+          <div class="prep-h"><b class="display">قبل لا تحجز</b><span>🛂 ${esc(D.visaNote)}</span></div>
+          <div class="facts3">
+            <div>العملة<b>${esc(D.currency.name)} (${fmt(D.currency.perSAR, 2)} = ريال)</b></div>
+            <div>الطيران من السعودية<b>~${fmt(D.flightSAR)} ريال</b></div>
+            <div>الوجهات<b>${D.cities.length} وجهة · ${allPlaces.length} مكان</b></div>
+          </div>
         </div>
-      </section>
-
+        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate()), unit: curName(), days: plan.days, travelers: plan.travelers, go: "وريني الخيارات" })}`,
+      poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: `${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, stamp: `${D.cities.length}<br>وجهات` },
+    }) + `
       <div class="wrap">
         <section class="band" id="cities">
-          <div class="band-head">
-            <div>
-              <h2 class="display">${D.cities.length} وجهة تنتظرك</h2>
-              <p>من جبال الشمال لجزر الجنوب. اسحب وشوف.</p>
-            </div>
-            <div class="arrows no-print">
-              <button type="button" data-dir="1" aria-label="السابق">→</button>
-              <button type="button" data-dir="-1" aria-label="التالي">←</button>
-            </div>
-          </div>
-          <div class="postcards" id="cards">${cards}</div>
+          <div class="band-head"><div><h2 class="display">الوجهات</h2><p>اضغط على أي ملصق وشوف أماكنه وأسعاره.</p></div></div>
+          <div class="posters">${cards}</div>
         </section>
 
         <section class="band">
@@ -449,15 +466,10 @@
 
     document.getElementById("heroBudget").addEventListener("submit", (e) => {
       e.preventDefault();
-      const v = parseFloat(document.getElementById("hb").value.replace(/[^\d.]/g, ""));
-      if (v > 0) savePlan({ ...getPlan(), budget: v * rate() });
+      const t = readTicket(e.target);
+      savePlan({ ...getPlan(), ...(t.b > 0 ? { budget: t.b * rate() } : {}), days: t.d, travelers: t.t });
       location.hash = B() + "/plan";
     });
-    const cardsEl = document.getElementById("cards");
-    app.querySelectorAll(".arrows button").forEach((b) => b.addEventListener("click", () => {
-      const w = cardsEl.querySelector(".postcard").offsetWidth + 18;
-      cardsEl.scrollBy({ left: w * +b.dataset.dir, behavior: "smooth" });
-    }));
     loadPhotos(app);
   }
 
@@ -472,7 +484,7 @@
       ["التنقل داخل المدينة (للشخص في اليوم)", c.costs.transport],
     ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : "<span class='sub'>مشمول</span>"}</td>`).join("")}</tr>`).join("");
 
-    const places = c.places.map((p, i) => placeCard({ ...p, city: c, key: c.id + ":" + i })).join("");
+    const places = c.places.map((p, i) => placeCard({ ...p, city: c, key: D.id + ":" + c.id + ":" + i })).join("");
     const areas = c.stayAreas.map((a) => `<div class="area"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
     const mosques = c.halal.mosques.length
       ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
@@ -481,15 +493,13 @@
       .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td>${esc(t.mode)}</td><td>${hoursText(t.hours)}</td><td class="num">${money2(t.cost.eco)}</td></tr>`).join("");
 
     app.innerHTML = `
-      <section class="hero city-hero">
-        <div class="art">${cityScene(c)}</div>
-        <div class="wrap hero-in">
-          <div class="crumbs"><a href="#/${D.continent}">آسيا</a> ‹ <a href="${B()}">${D.flag} ${esc(D.name)}</a></div>
-          <h1 class="display">${esc(c.name)}</h1>
-          <p class="lead">${esc(c.summary)}</p>
-          <div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>
-        </div>
-      </section>
+      ${posterHero({
+        kick: `<a href="#/${D.continent}">آسيا</a> ‹ <a href="${B()}">${D.flag} ${esc(D.name)}</a>`,
+        title: esc(c.name),
+        lead: esc(c.summary),
+        body: `<div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>`,
+        poster: { art: cityScene(c, true), wiki: cityWiki(c), title: c.short || c.name, caption: `${D.flag} ${esc(D.name)} · ${esc(c.region)}`, stamp: `${c.places.length}<br>مكان` },
+      })}
 
       <div class="wrap city-grid">
         <div>
@@ -651,7 +661,7 @@
     let dayNo = 0, fees = 0, food = 0, local = 0, inter = 0, hotel = 0;
     route.forEach((c, ci) => {
       const n = alloc.get(c);
-      const pool = c.places.map((p, i) => ({ ...p, key: c.id + ":" + i }))
+      const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i }))
         .sort((a, b) => (interests.includes(b.type) ? 1 : 0) - (interests.includes(a.type) ? 1 : 0));
       const slotsOf = (p) => (p.time.includes("يوم كامل") ? 2 : 1);
       const tr = ci > 0 ? travel(route[ci - 1], c) : null;
@@ -825,17 +835,17 @@
       const left = s.budget - r.total;
       const chips = r.route.map((c) => `<span class="stop-chip">${c.emoji} ${esc(c.name)} · ${dayWord(r.alloc.get(c))}</span>`).join("");
       return `
-        <article class="opt ${isOver ? "over" : ""}">
-          <div class="opt-art">${cityScene(r.route[0], true)}<span class="tier-badge t-${r.tier}">${D.tiers[r.tier].name}</span></div>
-          <div class="opt-body">
+        <article class="opt tkt ${isOver ? "over" : ""}">
+          <div class="tkt-main">
+            <div class="opt-art">${cityScene(r.route[0], true)}${photoOver(cityWiki(r.route[0]))}<span class="tier-badge t-${r.tier}">${D.tiers[r.tier].name}</span></div>
             <h3>${r.route.map((c) => esc(c.short)).join(" ← ")}</h3>
             <div class="stops">${chips}</div>
-            <div class="opt-foot">
-              <div><span class="k">التكلفة</span><b>${money(r.total)}</b></div>
-              <div><span class="k">${isOver ? "ينقصك" : "يبقى معك"}</span><b class="${isOver ? "neg" : "pos"}">${money(Math.abs(left))}</b></div>
-              <button type="button" class="btn small" data-opt="${i}">شوف البرنامج</button>
-            </div>
           </div>
+          <button type="button" class="tkt-stub" data-opt="${i}">
+            <small>التكلفة</small><b>${money(r.total)}</b>
+            <em class="${isOver ? "neg" : ""}">${isOver ? "ينقصك" : "يبقى"} ${money(Math.abs(left))}</em>
+            <span class="see">شوف البرنامج</span>
+          </button>
         </article>`;
     };
 
@@ -868,6 +878,7 @@
         <p class="hint" style="margin-top:-6px">لو قعدت كل رحلتك في وجهة وحدة. الأخضر يغطي ${dayWord(s.days)} أو أكثر.</p>
         <div class="dests">${destCards}</div>
       </section>`;
+    loadPhotos(resEl);
     resEl.querySelectorAll("[data-opt]").forEach((b) => b.addEventListener("click", () => openOption(lastOptions[+b.dataset.opt], s)));
   }
 
@@ -1004,9 +1015,9 @@
     const C = inCountry ? D : last;
     const base = C ? "#/c/" + C.id : "#/asia";
     nav.innerHTML = `
-      <a href="#/" data-route="world" aria-label="القارات">🌍<span class="nl"> الوجهات</span></a>
-      ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}">${C.flag}<span class="nl"> ${esc(C.name)}</span></a>` : ""}
-      ${C ? `<a href="${base}/plan" data-route="plan">ميزانيتي</a><a href="${base}/places" data-route="places">الأماكن</a><a href="${base}/before" data-route="before">قبل السفر</a>` : ""}`;
+      <a href="#/" data-route="world" aria-label="القارات"><i>🌍</i>الوجهات</a>
+      ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}"><i>${C.flag}</i>${esc(C.name)}</a>` : ""}
+      ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>ميزانيتي</a><a href="${base}/places" data-route="places"><i>📍</i>الأماكن</a><a href="${base}/before" data-route="before"><i>🧳</i>قبل السفر</a>` : ""}`;
     nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.route === page || (page === "city" && a.dataset.route === "country") || (page === "continent" && a.dataset.route === "world")));
     const loc = curBox.querySelector('[data-cur="LOCAL"]');
     loc.textContent = C ? C.currency.name : "محلي";
