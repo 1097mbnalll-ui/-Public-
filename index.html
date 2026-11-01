@@ -2,45 +2,48 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>وين نروح؟ دليل فيتنام</title>
   <meta name="description" content="دليل عربي للسفر إلى فيتنام: الأماكن والسكن والأسعار والأكل الحلال، ومخطط رحلة يعطيك برنامج يوم بيوم مع الميزانية.">
+  <meta name="theme-color" content="#1d1b3a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Readex+Pro:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
 </head>
-<body>
+<body class="page-home">
   <header class="topbar">
     <div class="wrap">
-      <a class="logo" href="#/">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="19" cy="6" r="2.5" fill="#f2b233"/><path d="M7 16 Q 6 8 16.5 7" fill="none" stroke="#f2b233" stroke-width="1.6" stroke-dasharray="2.5 2.5" stroke-linecap="round"/></svg>
-        وين نروح؟
-      </a>
-      <nav class="nav" id="nav">
-        <a href="#/" data-route="home">الرئيسية</a>
-        <a href="#/plan" data-route="plan">خطط رحلتي</a>
-        <a href="#/before" data-route="before">قبل لا تسافر</a>
-      </nav>
-      <div class="currency" id="currency" role="group" aria-label="العملة">
-        <button data-cur="SAR">ريال</button>
-        <button data-cur="USD">دولار</button>
-        <button data-cur="VND">دونق</button>
+      <div class="pill">
+        <a class="logo" href="#/" aria-label="وين نروح؟ الرئيسية">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="19" cy="6" r="2.8" fill="#ff6b4a"/><path d="M7 16 Q 6 8 16.3 6.8" fill="none" stroke="#ff6b4a" stroke-width="1.8" stroke-dasharray="2.5 2.5" stroke-linecap="round"/></svg>
+          <span>وين نروح؟</span>
+        </a>
+        <nav class="nav" id="nav">
+          <a href="#/" data-route="home">الرئيسية</a>
+          <a href="#/plan" data-route="plan">خطط رحلتي</a>
+          <a href="#/before" data-route="before">قبل السفر</a>
+        </nav>
+        <div class="currency" id="currency" role="group" aria-label="العملة">
+          <button type="button" data-cur="SAR">ريال</button>
+          <button type="button" data-cur="USD">$</button>
+          <button type="button" data-cur="VND">دونق</button>
+        </div>
       </div>
     </div>
   </header>
 
-  <main>
-    <div class="wrap" id="app"></div>
-  </main>
+  <main id="app"></main>
 
   <footer>
     <div class="wrap">
+      <div class="logo">وين نروح؟</div>
       الأسعار تقريبية ومأخوذة من المصادر المذكورة جنب كل رقم، وتتغير مع الوقت. تأكد منها قبل الحجز.
     </div>
   </footer>
 
   <script src="data/vietnam.js"></script>
+  <script src="assets/scenes.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

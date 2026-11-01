@@ -84,37 +84,78 @@
       </svg>`;
   }
 
+  // ---------- عناصر مشتركة ----------
+  const ICONS = { history: "🏯", nature: "⛰️", beach: "🏖️", food: "🍜", fun: "🎡" };
+  const scene = (id, mid) => {
+    const out = window.SCENES[id] ? window.SCENES[id]() : "";
+    return mid ? out.replace("xMidYMax slice", "xMidYMid slice") : out;
+  };
+
   // ---------- الرئيسية ----------
   function viewHome() {
-    const rows = D.cities.map((c, i) => `
-      <a class="board-row" href="#/city/${c.id}">
-        <span class="flap">${c.emoji}</span>
-        <span class="dest">${esc(c.name)}<small>${esc(c.en)} ${esc(c.code)}</small></span>
-        <span class="col region">${esc(c.region)}</span>
-        <span class="col days">${dayWord(c.days.ideal)}</span>
-        <span class="col price">من ${money(c.costs.hotel.eco)}</span>
+    const cards = D.cities.map((c) => `
+      <a class="postcard" href="#/city/${c.id}">
+        <div class="art">${scene(c.id)}</div>
+        <span class="stamp">${esc(c.code)}<small>${esc(c.region)}</small></span>
+        <div class="body">
+          <h3>${esc(c.name)}</h3>
+          <p>${esc(c.summary)}</p>
+          <div class="foot"><span>${dayWord(c.days.ideal)} مقترحة</span><span>السكن من <b>${money(c.costs.hotel.eco)}</b></span></div>
+        </div>
       </a>`).join("");
+
+    const presets = [[4, "استراحة قصيرة"], [7, "أسبوع كامل"], [10, "شمال لجنوب"], [14, "كل فيتنام"]]
+      .map(([d, t]) => `<a class="preset" href="#/plan/${d}"><b>${dayWord(d)}</b><span>${t}</span></a>`).join("");
 
     app.innerHTML = `
       <section class="hero">
-        <div>
-          <h1>خطط رحلتك لفيتنام قبل ما تحجز</h1>
-          <p class="lead">وين تروح، وين تسكن، وكم بتصرف، ووين تلقى أكل حلال. كل رقم جنبه مصدره.</p>
+        <div class="art">${scene("halong")}</div>
+        <div class="wrap hero-in">
+          <h1 class="display">فيتنام تنتظرك</h1>
+          <p class="lead">وين تروح، وين تسكن، وكم بتصرف، ووين تلقى أكل حلال. خطط رحلتك كاملة قبل ما تحجز.</p>
           <div class="actions">
             <a class="btn" href="#/plan">ابدأ خطة رحلتي</a>
-            <a class="btn ghost" href="#/before">قبل لا تسافر</a>
+            <a class="btn glass" href="#cities" data-scroll>تصفح المدن</a>
           </div>
         </div>
-        <div class="map">${mapSVG(D.cities, { animate: true })}</div>
       </section>
 
-      <section class="board" id="cities">
-        <h2>الوجهات <small>اختر مدينة وتصفح أماكنها وأسعارها</small></h2>
-        <div class="board-row board-head" aria-hidden="true">
-          <span></span><span>المدينة</span><span class="col region">المنطقة</span><span class="col days">المدة المقترحة</span><span class="col">السكن لليلة</span>
-        </div>
-        ${rows}
-      </section>`;
+      <div class="wrap">
+        <section class="band" id="cities">
+          <div class="band-head">
+            <div>
+              <h2 class="display">اختر محطتك</h2>
+              <p>خمس وجهات من الشمال للجنوب. اسحب وشوف.</p>
+            </div>
+            <div class="arrows no-print">
+              <button type="button" data-dir="1" aria-label="السابق">→</button>
+              <button type="button" data-dir="-1" aria-label="التالي">←</button>
+            </div>
+          </div>
+          <div class="postcards" id="cards">${cards}</div>
+        </section>
+
+        <section class="quick">
+          <div class="art">${scene("hcmc")}</div>
+          <h2 class="display">كم يوم عندك؟</h2>
+          <p>اختر المدة ونرتب لك المدن والأيام والتكلفة، وبعدها عدّل على كيفك.</p>
+          <div class="presets">${presets}</div>
+        </section>
+
+        <section class="band">
+          <div class="tiles">
+            <a class="tile" href="#/before"><div class="ico">🧳</div><h3>قائمة التجهيز</h3><p>التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.</p></a>
+            <a class="tile" href="#/city/hcmc"><div class="ico">🕌</div><h3>أكل حلال ومساجد</h3><p>في كل مدينة قسم للمطاعم الحلال والمساجد القريبة.</p></a>
+            <div class="tile"><div class="ico">🔎</div><h3>كل رقم له مصدر</h3><p>جنب كل سعر مصدره وتاريخ آخر تحقق منه.</p></div>
+          </div>
+        </section>
+      </div>`;
+
+    const cardsEl = document.getElementById("cards");
+    app.querySelectorAll(".arrows button").forEach((b) => b.addEventListener("click", () => {
+      const w = cardsEl.querySelector(".postcard").offsetWidth + 18;
+      cardsEl.scrollBy({ left: w * +b.dataset.dir, behavior: "smooth" });
+    }));
   }
 
   // ---------- صفحة المدينة ----------
@@ -130,17 +171,14 @@
       <tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : "<span class='sub'>مشمول</span>"}</td>`).join("")}</tr>`).join("");
 
     const places = c.places.map((p) => `
-      <li class="stop-row">
-        <div>
-          <h3>${esc(p.name)}</h3>
-          <p>${esc(p.desc)}</p>
-        </div>
+      <div class="place">
+        <div class="ico" aria-hidden="true">${ICONS[p.type] || "📍"}</div>
+        <div><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></div>
         <div class="fee">${p.fee ? money(p.fee) : "مجانًا"}<small>${esc(p.time)}</small></div>
         ${src(p.src, p.date)}
-      </li>`).join("");
+      </div>`).join("");
 
-    const areas = c.stayAreas.map((a) => `
-      <div class="sheet"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
+    const areas = c.stayAreas.map((a) => `<div class="area"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
 
     const mosques = c.halal.mosques.length
       ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
@@ -154,76 +192,83 @@
       }).join("");
 
     app.innerHTML = `
-      <div class="crumbs"><a href="#/">الرئيسية</a> ‹ ${esc(c.name)}</div>
-      <section class="hero">
-        <div>
-          <h1>${esc(c.name)}</h1>
-          <div class="tags">
-            <span class="tag">${esc(c.region)}</span>
-            <span class="tag">المدة المقترحة ${dayWord(c.days.ideal)}</span>
-            ${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${esc(D.interests[k])}</span>`).join("")}
-          </div>
+      <section class="hero city-hero">
+        <div class="art">${scene(c.id)}</div>
+        <div class="wrap hero-in">
+          <div class="crumbs"><a href="#/">الرئيسية</a></div>
+          <h1 class="display">${esc(c.name)}</h1>
           <p class="lead">${esc(c.summary)}</p>
-          <div class="season"><b>أفضل وقت:</b> ${esc(c.bestTime)}</div>
-        </div>
-        <div class="map">${mapSVG([c])}</div>
-      </section>
-
-      <section class="block">
-        <h2>كم بتصرف؟</h2>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th></th>${TIERS.map((t) => `<th>${D.tiers[t].name}</th>`).join("")}</tr></thead>
-            <tbody>${tierRows}</tbody>
-          </table>
-        </div>
-        ${c.costs.note ? `<p class="hint">${esc(c.costs.note)}</p>` : ""}
-        ${src(c.costs.src, c.costs.date, "numbeo")}
-      </section>
-
-      <section class="block">
-        <h2>وش تزور؟</h2>
-        <ul class="stops">${places}</ul>
-      </section>
-
-      <section class="block">
-        <h2>وين تسكن؟</h2>
-        <div class="areas">${areas}</div>
-      </section>
-
-      <section class="block">
-        <h2>الأكل الحلال والمساجد</h2>
-        <div class="sheet">
-          ${mosques}
-          <p style="margin:10px 0 0">${esc(c.halal.food)}</p>
-          ${src(c.halal.src, c.halal.date)}
+          <div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>
         </div>
       </section>
 
-      <section class="block">
-        <h2>التنقل</h2>
-        <ul class="clean">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
-        ${others ? `
-        <h3 style="margin-top:22px">من ${esc(c.name)} للمدن الثانية</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>إلى</th><th>الطريقة</th><th>المدة</th><th>من (للشخص)</th></tr></thead>
-            <tbody>${others}</tbody>
-          </table>
-        </div>
-        ${src(D.routesSrc, D.routesDate)}` : ""}
-      </section>
+      <div class="wrap city-grid">
+        <div>
+          <section class="block">
+            <h2>وش تزور؟</h2>
+            <div class="places">${places}</div>
+          </section>
 
-      <div class="block no-print"><a class="btn" href="#/plan">خطط رحلة فيها ${esc(c.name)}</a></div>`;
+          <section class="block">
+            <h2>كم بتصرف؟</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th></th>${TIERS.map((t) => `<th>${D.tiers[t].name}</th>`).join("")}</tr></thead>
+                <tbody>${tierRows}</tbody>
+              </table>
+            </div>
+            ${c.costs.note ? `<p class="hint">${esc(c.costs.note)}</p>` : ""}
+            ${src(c.costs.src, c.costs.date, "numbeo")}
+          </section>
+
+          <section class="block">
+            <h2>وين تسكن؟</h2>
+            <div class="areas">${areas}</div>
+          </section>
+
+          <section class="block">
+            <h2>الأكل الحلال والمساجد</h2>
+            <div class="note">
+              ${mosques}
+              <p style="margin:10px 0 0">${esc(c.halal.food)}</p>
+              ${src(c.halal.src, c.halal.date)}
+            </div>
+          </section>
+
+          <section class="block">
+            <h2>التنقل</h2>
+            <ul class="clean">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+            ${others ? `
+            <h3 style="margin-top:22px">من ${esc(c.name)} للمدن الثانية</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>إلى</th><th>الطريقة</th><th>المدة</th><th>من (للشخص)</th></tr></thead>
+                <tbody>${others}</tbody>
+              </table>
+            </div>
+            ${src(D.routesSrc, D.routesDate)}` : ""}
+          </section>
+        </div>
+
+        <aside class="facts">
+          <dl>
+            <div><dt>أفضل وقت</dt><dd>${esc(c.bestTime)}</dd></div>
+            <div><dt>المدة المقترحة</dt><dd>${dayWord(c.days.ideal)}</dd></div>
+            <div><dt>السكن لليلة</dt><dd>من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}</dd></div>
+            <div><dt>المطار</dt><dd style="direction:ltr;text-align:end">${esc(c.code)}</dd></div>
+          </dl>
+          <a class="btn no-print" href="#/plan">خطط رحلة فيها ${esc(c.name)}</a>
+        </aside>
+      </div>`;
   }
 
-  // ---------- قبل لا تسافر: قائمة تجهيز ----------
+  // ---------- قبل لا تسافر ----------
   function viewBefore() {
     const done = store.get("checklist", {});
     const total = D.before.reduce((s, b) => s + b.points.length, 0);
     const blocks = D.before.map((b, bi) => `
-      <div class="sheet">
-        <h2>${b.icon} ${esc(b.title)} <small data-count="${bi}"></small></h2>
+      <div class="check-card" data-card="${bi}">
+        <h2><span>${b.icon} ${esc(b.title)}</span><small data-count="${bi}"></small></h2>
         ${b.points.map((p, pi) => {
           const k = bi + "-" + pi;
           return `<label class="check"><input type="checkbox" data-k="${k}" ${done[k] ? "checked" : ""}><span>${esc(p)}</span></label>`;
@@ -232,10 +277,14 @@
       </div>`).join("");
 
     app.innerHTML = `
-      <h1>قبل لا تسافر</h1>
-      <p class="lead">أشّر على كل نقطة خلصتها أو قريتها. القائمة تنحفظ على جهازك.</p>
-      <div class="progress"><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
-      <div class="checklist">${blocks}</div>`;
+      <div class="wrap">
+        <div class="page-title">
+          <h1 class="display">جهّز شنطتك</h1>
+          <p class="lead">كل اللي تحتاج تعرفه قبل السفر. أشّر على اللي خلصته، والقائمة تنحفظ على جهازك.</p>
+        </div>
+        <div class="progress"><div class="bar"><i id="bar"></i></div><span id="pct"></span></div>
+        <div class="checklist">${blocks}</div>
+      </div>`;
 
     const paint = () => {
       const n = Object.values(done).filter(Boolean).length;
@@ -243,7 +292,8 @@
       document.getElementById("pct").textContent = `${n} من ${total}`;
       D.before.forEach((b, bi) => {
         const c = b.points.filter((_, pi) => done[bi + "-" + pi]).length;
-        app.querySelector(`[data-count="${bi}"]`).textContent = `${c} / ${b.points.length}`;
+        app.querySelector(`[data-count="${bi}"]`).textContent = c === b.points.length ? "تم ✓" : `${c} / ${b.points.length}`;
+        app.querySelector(`[data-card="${bi}"]`).classList.toggle("done", c === b.points.length);
       });
     };
     app.querySelector(".checklist").addEventListener("change", (e) => {
@@ -348,40 +398,47 @@
     };
   }
 
-  function viewPlan() {
+  function viewPlan(presetDays) {
     const saved = store.get("plan", { days: 7, tier: "mid", interests: ["history", "beach"], travelers: 2 });
+    if (presetDays >= 3 && presetDays <= 14) saved.days = presetDays;
     const chips = Object.entries(D.interests).map(([k, v]) => `
-      <label class="chip"><input type="checkbox" name="interest" value="${k}" ${saved.interests.includes(k) ? "checked" : ""}><span>${v}</span></label>`).join("");
+      <label class="chip"><input type="checkbox" name="interest" value="${k}" ${saved.interests.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("");
     const tiers = TIERS.map((t) => `
       <label class="chip"><input type="radio" name="tier" value="${t}" ${saved.tier === t ? "checked" : ""}><span>${D.tiers[t].name}</span></label>`).join("");
 
     app.innerHTML = `
-      <h1>خطط رحلتي</h1>
-      <p class="lead">غيّر الخيارات، والخطة والتكلفة تتحدّث مباشرة.</p>
-      <div class="planner">
-        <form class="sheet form" id="planForm" onsubmit="return false">
-          <div class="field">
-            <label for="days">مدة الرحلة</label>
-            <div class="range-row"><input type="range" id="days" min="3" max="14" value="${saved.days}"><output id="daysOut"></output></div>
-          </div>
-          <div class="field">
-            <label for="travelers">عدد المسافرين</label>
-            <div class="range-row"><input type="range" id="travelers" min="1" max="6" value="${saved.travelers}"><output id="trOut"></output></div>
-          </div>
-          <div class="field">
-            <span class="label">الميزانية</span>
-            <div class="chips">${tiers}</div>
-            <div class="hint" id="tierHint"></div>
-          </div>
-          <div class="field">
-            <span class="label">وش تحب؟</span>
-            <div class="chips">${chips}</div>
-          </div>
-        </form>
-        <div id="result"></div>
+      <div class="wrap">
+        <div class="page-title">
+          <h1 class="display">خطط رحلتي</h1>
+          <p class="lead">غيّر الخيارات، والخطة والتكلفة تتحدّث مباشرة.</p>
+        </div>
+        <div class="planner">
+          <form class="form" id="planForm" onsubmit="return false">
+            <div class="field">
+              <label for="days">مدة الرحلة <output id="daysOut"></output></label>
+              <input type="range" id="days" min="3" max="14" value="${saved.days}">
+            </div>
+            <div class="field">
+              <label for="travelers">عدد المسافرين <output id="trOut"></output></label>
+              <input type="range" id="travelers" min="1" max="6" value="${saved.travelers}">
+            </div>
+            <div class="field">
+              <span class="label">الميزانية</span>
+              <div class="chips">${tiers}</div>
+              <div class="hint" id="tierHint"></div>
+            </div>
+            <div class="field">
+              <span class="label">وش تحب؟</span>
+              <div class="chips">${chips}</div>
+            </div>
+          </form>
+          <div class="result" id="result"></div>
+        </div>
       </div>`;
 
     const form = document.getElementById("planForm");
+    const resEl = document.getElementById("result");
+    let first = true, timer;
     const update = () => {
       const days = +form.days.value;
       const travelers = +form.travelers.value;
@@ -392,7 +449,10 @@
       document.getElementById("tierHint").textContent = D.tiers[tier].desc;
       const s = { days, tier, interests, travelers };
       store.set("plan", s);
-      renderResult(buildPlan(s));
+      if (first) { first = false; renderResult(buildPlan(s)); return; }
+      resEl.classList.add("updating");
+      clearTimeout(timer);
+      timer = setTimeout(() => { renderResult(buildPlan(s)); resEl.classList.remove("updating"); }, 120);
     };
     form.addEventListener("input", update);
     form.addEventListener("change", update);
@@ -407,16 +467,21 @@
     const days = r.plan.map((d) => `
       <li class="tl-day ${d.newCity ? "new-city" : ""}">
         <span class="badge">${d.day}</span>
-        <div class="where">${esc(d.city.name)}</div>
-        ${d.travel ? `<div class="travel">✈ ${esc(d.travel)}</div>` : ""}
-        <ul>${d.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+        <div class="tl-card">
+          ${d.newCity ? `<div class="strip">${scene(d.city.id, true)}</div>` : ""}
+          <div class="in">
+            <div class="where">${esc(d.city.name)}</div>
+            ${d.travel ? `<div class="travel">✈ ${esc(d.travel)}</div>` : ""}
+            <ul>${d.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+          </div>
+        </div>
       </li>`).join("");
 
     const p = r.parts;
     document.getElementById("result").innerHTML = `
       <div class="pass">
+        <div class="pass-art">${scene(last.id, true)}<span class="ttl">بطاقة رحلتك</span></div>
         <div class="pass-main">
-          <div class="pass-airline"><b>بطاقة رحلتك</b><span>فيتنام</span></div>
           <div class="pass-route">
             <div class="code">${esc(first.code)}<small>${esc(first.name)}</small></div>
             <div class="line"></div>
@@ -455,27 +520,55 @@
       </div>
 
       <div class="no-print actions">
-        <button class="btn" onclick="window.print()">اطبع الخطة أو احفظها PDF</button>
-        <a class="btn ghost" href="#/before">قائمة التجهيز قبل السفر</a>
+        <button class="btn" type="button" onclick="window.print()">اطبع الخطة أو احفظها PDF</button>
+        <a class="btn ghost" href="#/before">قائمة التجهيز</a>
       </div>`;
   }
 
   function viewNotFound() {
-    app.innerHTML = `<h1>الصفحة مو موجودة</h1><p><a href="#/">ارجع للرئيسية</a></p>`;
+    app.innerHTML = `<div class="wrap"><h1 class="display">الصفحة مو موجودة</h1><p><a href="#/">ارجع للرئيسية</a></p></div>`;
   }
 
+  // ---------- عمق الطبقات مع التمرير ----------
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let ticking = false;
+  function parallax() {
+    ticking = false;
+    const y = window.scrollY;
+    document.querySelectorAll(".hero [data-depth]").forEach((el) => {
+      el.style.transform = `translateY(${(y * parseFloat(el.dataset.depth)).toFixed(1)}px)`;
+    });
+  }
+  if (!reduced) window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(parallax); } }, { passive: true });
+
   // ---------- التوجيه ----------
-  function route() {
+  function render() {
     const h = location.hash.replace(/^#\/?/, "");
     const [page, arg] = h.split("/");
+    document.body.className = "page-" + (page || "home");
     document.querySelectorAll("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === (page || "home")));
     if (!page) viewHome();
     else if (page === "city") viewCity(arg);
     else if (page === "before") viewBefore();
-    else if (page === "plan") viewPlan();
+    else if (page === "plan") viewPlan(+arg);
     else viewNotFound();
-    window.scrollTo(0, 0);
+    if (reduced) document.querySelectorAll("svg.scene").forEach((s) => s.pauseAnimations && s.pauseAnimations());
   }
+
+  function route() {
+    if (location.hash === "#cities") return;
+    const go = () => { render(); window.scrollTo({ top: 0, behavior: "instant" }); };
+    if (document.startViewTransition && !reduced) document.startViewTransition(go);
+    else go();
+  }
+
+  // رابط "تصفح المدن" يمرر بدون تغيير الصفحة
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-scroll]");
+    if (!a) return;
+    e.preventDefault();
+    document.querySelector(a.getAttribute("href")).scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
+  });
 
   // ---------- العملة ----------
   const curBox = document.getElementById("currency");
@@ -489,11 +582,11 @@
     store.set("currency", currency);
     paintCurrency();
     const y = window.scrollY;
-    route();
-    window.scrollTo(0, y);
+    render();
+    window.scrollTo({ top: y, behavior: "instant" });
   });
 
   paintCurrency();
   window.addEventListener("hashchange", route);
-  route();
+  render();
 })();
