@@ -26,6 +26,10 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setTextZoom(100);
 
         web.setWebViewClient(new WebViewClient() {
             @Override

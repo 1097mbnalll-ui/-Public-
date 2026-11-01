@@ -1380,175 +1380,210 @@
       if (st.layer === "transport") return k.transport[t];
       return (k.hotel[t] * f) / 2 + k.food[t] * Math.sqrt(f) + k.transport[t];
     };
-    const unitLabel = () => (st.layer === "hotel" ? T("لليلة", "per night") : T("للشخص باليوم", "pp / day"));
+    const legendTitle = () => (st.layer === "hotel" ? T("سعر الليلة", "Price per night") : st.layer === "food" ? T("الأكل للشخص باليوم", "Food per person per day") : st.layer === "transport" ? T("التنقل للشخص باليوم", "Transport per person per day") : T("الإجمالي للشخص باليوم", "Total per person per day"));
 
-    // النقاط: مدن الدولة أو أحياء العاصمة
-    let items, outline = null, bounds;
+    // النقاط
+    let items, bounds;
     if (!CM) {
-      outline = M.outline;
-      items = D.cities.map((c) => { const [x, y] = M.project(c.lat, c.lon); return { id: c.id, c, x, y, name: c.short || c.name, v: value(c), main: c.id === M.capital }; });
+      items = D.cities.map((c) => { const [x, y] = M.project(c.lat, c.lon); return { id: c.id, c, x, y, name: c.short || c.name, main: c.id === M.capital }; });
       bounds = [-30, -15, 240, 405];
     } else {
-      items = CM.districts.map((d) => ({ id: d.id, d, x: d.x, y: d.y, name: L(d.name), v: value(city, d.f), main: !!d.main }));
-      bounds = [-460, -330, 920, 700];
+      items = CM.districts.map((d) => ({ id: d.id, d, x: d.x, y: d.y, name: L(d.name), main: !!d.main }));
+      bounds = window.innerWidth > 860 ? [-460, -330, 920, 700] : [-380, -230, 760, 430];
     }
-    const vs = items.map((i) => i.v), vmin = Math.min(...vs), vmax = Math.max(...vs);
+    let vs, vmin, vmax, avg;
     const norm = (v) => (vmax === vmin ? 0.5 : (v - vmin) / (vmax - vmin));
+    const compute = () => {
+      items.forEach((i) => { i.v = CM ? value(city, i.d.f) : value(i.c); });
+      vs = items.map((i) => i.v); vmin = Math.min(...vs); vmax = Math.max(...vs); avg = vs.reduce((a, b) => a + b, 0) / vs.length;
+    };
+    compute();
     let sel = store.get("mapSel:" + (cityId || D.id), null);
     if (!items.find((i) => i.id === sel)) sel = (items.find((i) => i.main) || items[0]).id;
 
-    const chips = `
-      <div class="mv-chips">
-        ${LAYERS.map(([k, l]) => `<button type="button" class="mv-chip glass ${st.layer === k ? "on" : ""}" data-layer="${k}">${l}</button>`).join("")}
-        <span class="mv-sep"></span>
-        ${TIERS.map((t) => `<button type="button" class="mv-chip glass ${st.tier === t ? "on" : ""}" data-tier="${t}">${D.tiers[t].name}</button>`).join("")}
-        ${CM ? `<button type="button" class="mv-chip glass ${st.stay === "apt" ? "on" : ""}" data-stay>🏠 ${st.stay === "apt" ? "Airbnb" : T("فندق", "Hotel")} ⇄</button>` : ""}
-      </div>`;
-    app.innerHTML = `
-      <div class="mapview ${CM ? "is-city" : ""}" id="mv">
-        <svg id="msvg" class="mv-svg" role="img" aria-label="${T("خريطة الأسعار", "Price map")}">
-          <defs>
-            <radialGradient id="mvSea" cx="70%" cy="35%" r="90%"><stop offset="0" stop-color="#d5ebe8"/><stop offset="1" stop-color="#a9d1d0"/></radialGradient>
-            <filter id="mvBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${CM ? 55 : 14}"/></filter>
-            <filter id="mvShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0f3d3e" flood-opacity=".25"/></filter>
-            <pattern id="mvTopo" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M0,5 Q2.5,2 5,5 T10,5" fill="none" stroke="#e3d6bb" stroke-width=".6"/></pattern>
-            ${outline ? `<clipPath id="mvClip"><path d="${smoothPath(outline)}"/></clipPath>` : ""}
-          </defs>
-          <rect x="-2000" y="-2000" width="5000" height="5000" fill="${CM ? "#efe7d6" : "url(#mvSea)"}"/>
-          <g id="mvBase"></g><g id="mvHeat" filter="url(#mvBlur)" opacity=".78"></g><g id="mvOver"></g><g id="mvPins"></g>
-        </svg>
-        <div class="mv-top">
-          <div class="mv-crumb glass">${CM ? `<a href="${B()}/map">${D.flag} ${esc(D.name)}</a> ‹ <b>${esc(city.short || city.name)}</b> · ${T("الأحياء", "Neighbourhoods")}` : `${D.flag} <b>${esc(D.name)}</b> · ${T("خريطة الأسعار", "Price map")}`}</div>
-        </div>
-        ${chips}
-        <div class="mv-ctl glass"><button type="button" data-z="in" aria-label="${T("تكبير", "Zoom in")}">＋</button><button type="button" data-z="out" aria-label="${T("تصغير", "Zoom out")}">－</button><button type="button" data-z="reset" aria-label="${T("رجوع", "Reset")}">◎</button></div>
-        <div class="mv-legend glass"><b>${st.layer === "hotel" ? T("سعر الليلة", "Price per night") : st.layer === "food" ? T("الأكل للشخص باليوم", "Food per person per day") : st.layer === "transport" ? T("التنقل للشخص باليوم", "Transport per person per day") : T("الإجمالي للشخص باليوم", "Total per person per day")}</b><div class="mv-bar"></div><div class="mv-ends"><span>${T("أرخص", "Cheaper")} · ${money(vmin)}</span><span>${T("أغلى", "Pricier")} · ${money(vmax)}</span></div><small>${T("أسعار تقديرية", "Estimated prices")}${CM ? T(" · مواقع الأحياء تقريبية", " · approximate neighbourhood layout") : ""}</small></div>
-        <aside class="mv-sheet" id="mvSheet"></aside>
-      </div>`;
-
-    const svg = document.getElementById("msvg");
-    const base = document.getElementById("mvBase"), heat = document.getElementById("mvHeat"), over = document.getElementById("mvOver"), pinsG = document.getElementById("mvPins");
-    // الخلفية
+    // الرسمة الثابتة (تنرسم مرة وحدة، والتحريك يكون بتحويل GPU)
+    const PAD = CM ? 220 : 80;
+    const W0 = { x: bounds[0] - PAD, y: bounds[1] - PAD, w: bounds[2] + PAD * 2, h: bounds[3] + PAD * 2 };
+    let art = "";
     if (!CM) {
-      const land = smoothPath(outline);
-      base.innerHTML = `${[...Array(8)].map((_, i) => `<path d="M-80,${i * 55 - 10} C40,${i * 55 - 25} 160,${i * 55 + 15} 320,${i * 55 - 5}" stroke="#fff" stroke-opacity=".2" fill="none" stroke-width=".8"/>`).join("")}
-        <path d="${land}" fill="#f4ecdc" filter="url(#mvShadow)"/><path d="${land}" fill="url(#mvTopo)" opacity=".7"/>`;
-      heat.setAttribute("clip-path", "url(#mvClip)");
-      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${i.main ? 34 : 26}" fill="${heatCol(norm(i.v))}"/>`).join("");
-      over.innerHTML = `<path d="${land}" fill="none" stroke="#fff" stroke-width="2"/><path d="${land}" fill="none" stroke="#12312f" stroke-opacity=".25" stroke-width=".7"/>`;
+      const land = smoothPath(M.outline);
+      art = `${[...Array(10)].map((_, i) => `<path d="M${W0.x},${W0.y + i * 60} C${W0.x + 120},${W0.y + i * 60 - 15} ${W0.x + 260},${W0.y + i * 60 + 20} ${W0.x + W0.w},${W0.y + i * 60}" stroke="#fff" stroke-opacity=".22" fill="none" stroke-width=".8"/>`).join("")}
+        <path d="${land}" fill="#0f3d3e" opacity=".12" transform="translate(2 5)"/>
+        <path d="${land}" fill="#f4ecdc"/>
+        <g clip-path="url(#mvClip)" id="mvHeat"></g>
+        <path d="${land}" fill="none" stroke="#fff" stroke-width="2"/><path d="${land}" fill="none" stroke="#12312f" stroke-opacity=".22" stroke-width=".7"/>`;
     } else {
       let streets = "";
       for (let i = -9; i <= 9; i++) {
-        streets += `<path d="${smoothPath([[-520, i * 55 - 30], [-200, i * 55 + 10], [60, i * 55 - 15], [520, i * 55 + 20]], false)}" stroke="#fff" stroke-width="${i % 3 ? 1.4 : 3.5}" fill="none" opacity=".85"/>`;
-        streets += `<path d="${smoothPath([[i * 60 - 20, -420], [i * 60 + 15, -120], [i * 60 - 10, 140], [i * 60 + 20, 420]], false)}" stroke="#fff" stroke-width="${i % 3 ? 1.4 : 3.5}" fill="none" opacity=".85"/>`;
+        const sw = i % 3 ? 1.4 : 3.5;
+        streets += `<path d="${smoothPath([[-520, i * 55 - 30], [-200, i * 55 + 10], [60, i * 55 - 15], [520, i * 55 + 20]], false)}" stroke-width="${sw}"/>`;
+        streets += `<path d="${smoothPath([[i * 60 - 20, -420], [i * 60 + 15, -120], [i * 60 - 10, 140], [i * 60 + 20, 420]], false)}" stroke-width="${sw}"/>`;
       }
-      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${i.main ? 125 : 110}" fill="${heatCol(norm(i.v))}"/>`).join("");
       const w = CM.walk;
-      over.innerHTML = `${streets}
+      art = `<g id="mvHeat"></g>
+        <g stroke="#fff" fill="none" opacity=".85">${streets}</g>
         <path d="${smoothPath(CM.lake)}" fill="#a9d1d0"/><path d="${smoothPath(CM.pond)}" fill="#a9d1d0"/>
         <path d="${smoothPath(CM.river, false)}" stroke="#a9d1d0" stroke-width="70" fill="none" stroke-linecap="round"/>
         <path d="M120,-60 L250,-50" stroke="#c8323a" stroke-width="5"/>
-        <circle cx="${w.x}" cy="${w.y}" r="${w.r}" fill="rgba(15,61,62,.05)" stroke="#0f3d3e" stroke-width="1.5" stroke-dasharray="4 6" vector-effect="non-scaling-stroke"/>
+        <circle cx="${w.x}" cy="${w.y}" r="${w.r}" fill="rgba(15,61,62,.05)" stroke="#0f3d3e" stroke-width="1.5" stroke-dasharray="4 6"/>
         <text x="${w.x + w.r * 0.75}" y="${w.y + w.r + 18}" text-anchor="middle" font-size="13" font-weight="600" fill="#0f3d3e">🚶 ${T("15 دقيقة مشي", "15-min walk")}</text>
         <text x="-165" y="-215" text-anchor="middle" font-size="13" fill="#3f7f86" font-style="italic">${L(CM.lakeName)}</text>
         <text x="190" y="260" text-anchor="middle" font-size="13" fill="#3f7f86" font-style="italic" transform="rotate(-62 190 260)">${L(CM.riverName)}</text>
-        ${CM.landmarks.map(([e, x, y]) => `<g><circle cx="${x}" cy="${y}" r="17" fill="#fff" stroke="#0f3d3e" stroke-width="1.5"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="17">${e}</text></g>`).join("")}`;
+        ${CM.landmarks.map(([e, x, y]) => `<circle cx="${x}" cy="${y}" r="17" fill="#fff" stroke="#0f3d3e" stroke-width="1.5"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="17">${e}</text>`).join("")}`;
     }
-    pinsG.innerHTML = items.map((i) => `
-      <g class="mv-pin ${i.id === sel ? "sel" : ""}" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" tabindex="0" role="button" aria-label="${esc(i.name)} ${money(i.v)}">
-        <circle class="pdot" r="7" fill="${heatCol(norm(i.v))}" stroke="#fff" stroke-width="2.5"/>
-        <g class="mv-pin-in">
-          <rect class="pb" x="-44" y="-38" width="88" height="26" rx="13"/>
-          <circle cx="-30" cy="-25" r="4.5" fill="${heatCol(norm(i.v))}"/>
-          <text class="pv" x="6" y="-20" text-anchor="middle">${money(i.v)}</text>
-          <path class="pt" d="M-6,-12.5 L0,-5 L6,-12.5Z"/>
-          <text class="pn" y="10" text-anchor="middle">${esc(i.name)}</text>
-        </g>
-      </g>`).join("");
-    // عرض النص بعرض السعر
-    pinsG.querySelectorAll(".mv-pin").forEach((g) => {
-      const t = g.querySelector(".pv"); const w = Math.max(70, t.getComputedTextLength() + 34);
-      const r = g.querySelector(".pb"); r.setAttribute("x", -w / 2); r.setAttribute("width", w);
-      g.querySelector(".mv-pin-in circle").setAttribute("cx", -w / 2 + 12); t.setAttribute("x", 7);
-    });
 
-    // التكبير والتحريك
-    const home = { x: bounds[0], y: bounds[1], w: bounds[2], h: bounds[3] };
-    let v = { ...home };
-    const fit = () => {
-      const r = svg.getBoundingClientRect();
-      const sheetW = window.innerWidth > 860 ? 420 : 0;
-      const usable = Math.max(200, r.width - sheetW);
-      const topR = window.innerWidth > 860 ? 130 : 135, botR = window.innerWidth > 860 ? 30 : r.height * 0.4 + 60;
-      const usableH = Math.max(200, r.height - topR - botR);
-      const aspect = usableH / usable;
-      let w = home.w, h = home.h;
-      if (h / w > aspect) w = h / aspect; else h = w * aspect;
-      // نوسع العرض عشان البطاقة ما تغطي الخريطة
-      const extra = (w * sheetW) / usable;
-      const pxH = h / usableH;
-      v = { x: home.x - (w - home.w) / 2 - (EN_ON ? 0 : extra), y: home.y - (h - home.h) / 2 - topR * pxH, w: w + extra, h: h + (topR + botR) * pxH };
+    app.innerHTML = `
+      <div class="mapview ${CM ? "is-city" : ""}" id="mv">
+        <div class="mv-stage" id="mvStage">
+          <div class="mv-world" id="mvWorld"><svg id="msvg" viewBox="${W0.x} ${W0.y} ${W0.w} ${W0.h}" role="img" aria-label="${T("خريطة الأسعار", "Price map")}">
+            <defs>${!CM ? `<clipPath id="mvClip"><path d="${smoothPath(M.outline)}"/></clipPath>` : ""}<g id="mvGrads"></g></defs>
+            ${art}
+          </svg></div>
+          <div class="mv-pins" id="mvPins"></div>
+        </div>
+        <div class="mv-top"><div class="mv-crumb glass">${CM ? `<a href="${B()}/map">${D.flag} ${esc(D.name)}</a> ‹ <b>${esc(city.short || city.name)}</b> · ${T("الأحياء", "Neighbourhoods")}` : `${D.flag} <b>${esc(D.name)}</b> · ${T("خريطة الأسعار", "Price map")}`}</div></div>
+        <div class="mv-chips" id="mvChips"></div>
+        <div class="mv-ctl glass"><button type="button" data-z="in" aria-label="${T("تكبير", "Zoom in")}">＋</button><button type="button" data-z="out" aria-label="${T("تصغير", "Zoom out")}">－</button><button type="button" data-z="reset" aria-label="${T("رجوع", "Reset")}">◎</button></div>
+        <div class="mv-legend glass" id="mvLegend"></div>
+        <aside class="mv-sheet" id="mvSheet"></aside>
+      </div>`;
+
+    const stage = document.getElementById("mvStage"), world = document.getElementById("mvWorld"), svg = document.getElementById("msvg");
+    const pinsL = document.getElementById("mvPins"), sheet = document.getElementById("mvSheet");
+    const heat = document.getElementById("mvHeat"), grads = document.getElementById("mvGrads");
+
+    // الطبقات اللي تتغير مع الأزرار
+    const paintData = () => {
+      document.getElementById("mvChips").innerHTML = `
+        ${LAYERS.map(([k, l]) => `<button type="button" class="mv-chip glass ${st.layer === k ? "on" : ""}" data-layer="${k}">${l}</button>`).join("")}
+        <span class="mv-sep"></span>
+        ${TIERS.map((t) => `<button type="button" class="mv-chip glass ${st.tier === t ? "on" : ""}" data-tier="${t}">${D.tiers[t].name}</button>`).join("")}
+        ${CM ? `<button type="button" class="mv-chip glass ${st.stay === "apt" ? "on" : ""}" data-stay>🏠 ${st.stay === "apt" ? "Airbnb" : T("فندق", "Hotel")} ⇄</button>` : ""}`;
+      document.getElementById("mvLegend").innerHTML = `<b>${legendTitle()}</b><div class="mv-bar"></div><div class="mv-ends"><span>${T("أرخص", "Cheaper")} · ${money(vmin)}</span><span>${T("أغلى", "Pricier")} · ${money(vmax)}</span></div><small>${T("أسعار تقديرية", "Estimated prices")}${CM ? T(" · مواقع الأحياء تقريبية", " · approximate neighbourhood layout") : ""}</small>`;
+      // التدرج الحراري بتدرجات شعاعية بدل فلتر الضباب (أخف بكثير)
+      grads.innerHTML = items.map((i) => `<radialGradient id="hg-${i.id}"><stop offset="0" stop-color="${heatCol(norm(i.v))}" stop-opacity=".85"/><stop offset=".55" stop-color="${heatCol(norm(i.v))}" stop-opacity=".45"/><stop offset="1" stop-color="${heatCol(norm(i.v))}" stop-opacity="0"/></radialGradient>`).join("");
+      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${CM ? (i.main ? 190 : 165) : i.main ? 52 : 42}" fill="url(#hg-${i.id})"/>`).join("");
+      pinsL.innerHTML = items.map((i) => `<button type="button" class="mv-pin ${i.id === sel ? "sel" : ""}" data-id="${i.id}" aria-label="${esc(i.name)} ${money(i.v)}"><span class="pdot" style="background:${heatCol(norm(i.v))}"></span><span class="pin-in"><span class="pb"><i style="background:${heatCol(norm(i.v))}"></i>${money(i.v)}</span><span class="pn">${esc(i.name)}</span></span></button>`).join("");
+      pinEls = [...pinsL.children].map((el) => ({ el, it: items.find((x) => x.id === el.dataset.id), w: 0 }));
+      pinEls.forEach((p) => { p.w = p.el.querySelector(".pb").offsetWidth || 90; });
+      lastDeclK = -1;
     };
-    const apply = () => {
-      svg.setAttribute("viewBox", `${v.x} ${v.y} ${v.w} ${v.h}`);
-      const k = v.w / svg.getBoundingClientRect().width;
-      pinsG.querySelectorAll(".mv-pin").forEach((g) => g.setAttribute("transform", `translate(${g.dataset.x} ${g.dataset.y}) scale(${k})`));
-      declutter(k);
+
+    // الكاميرا: شاشة = (نقطة − أصل العالم) × س + إزاحة
+    let base = 1, cam = { k: 1, tx: 0, ty: 0 }, pinEls = [], lastDeclK = -1, raf = 0, idleT = 0;
+    const usable = () => {
+      const r = stage.getBoundingClientRect(), desk = window.innerWidth > 860;
+      const sheetW = desk ? 420 : 0, top = desk ? 130 : 135, bot = desk ? 30 : r.height * 0.4 + 95;
+      const x0 = desk && !EN_ON ? sheetW : 0;
+      return { x: x0 + 20, y: top, w: Math.max(200, r.width - sheetW - 40), h: Math.max(160, r.height - top - bot), W: r.width, H: r.height };
     };
-    // الدبابيس المتزاحمة تتحول لنقطة صغيرة، والأولوية للمختار والعاصمة والأكثر أماكن
+    const S = () => base * cam.k;
+    const toScreen = (x, y) => [(x - W0.x) * S() + cam.tx, (y - W0.y) * S() + cam.ty];
+    const toWorld = (sx, sy) => [(sx - cam.tx) / S() + W0.x, (sy - cam.ty) / S() + W0.y];
+    const fitCam = () => {
+      const u = usable();
+      const sc = Math.min(u.w / bounds[2], u.h / bounds[3]);
+      // نرسم العالم بدقة أعلى من الشاشة عشان يبقى حاد مع التكبير
+      base = Math.min(6, Math.max(1, sc * 1.6));
+      world.style.width = W0.w * base + "px"; world.style.height = W0.h * base + "px";
+      cam.k = sc / base;
+      cam.tx = u.x + (u.w - bounds[2] * sc) / 2 - (bounds[0] - W0.x) * sc;
+      cam.ty = u.y + (u.h - bounds[3] * sc) / 2 - (bounds[1] - W0.y) * sc;
+    };
+    const kMin = () => (usable().w / bounds[2]) / base * 0.5, kMax = () => (usable().w / bounds[2]) / base * 6;
+    const clampK = (k) => Math.max(kMin(), Math.min(kMax(), k));
+    const draw = () => {
+      raf = 0;
+      world.style.transform = `translate3d(${cam.tx}px,${cam.ty}px,0) scale(${cam.k})`;
+      for (const p of pinEls) { const [x, y] = toScreen(p.it.x, p.it.y); p.el.style.transform = `translate3d(${x}px,${y}px,0)`; }
+      if (Math.abs(cam.k - lastDeclK) > 1e-6) { lastDeclK = cam.k; declutter(); }
+    };
+    const req = () => { if (!raf) raf = requestAnimationFrame(draw); };
+    const moving = () => { world.classList.add("moving"); clearTimeout(idleT); idleT = setTimeout(() => world.classList.remove("moving"), 220); };
     const prio = (i) => (i.id === sel ? 1e6 : 0) + (i.main ? 1e5 : 0) + (i.c ? i.c.places.length : -Math.abs(i.d.walk));
-    const declutter = (k) => {
+    function declutter() {
       const placed = [];
-      [...items].sort((a, b) => prio(b) - prio(a)).forEach((i) => {
-        const g = pinsG.querySelector(`.mv-pin[data-id="${i.id}"]`);
-        const w = (+g.querySelector(".pb").getAttribute("width") + 8) * k, box = [i.x - w / 2, i.y - 40 * k, i.x + w / 2, i.y + 18 * k];
-        const hit = placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1]);
-        g.classList.toggle("mini", hit);
+      [...pinEls].sort((a, b) => prio(b.it) - prio(a.it)).forEach((p) => {
+        const [x, y] = toScreen(p.it.x, p.it.y);
+        const box = [x - p.w / 2 - 4, y - 40, x + p.w / 2 + 4, y + 18];
+        const hit = placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1]);
+        p.el.classList.toggle("mini", hit);
         if (!hit) placed.push(box);
       });
-      pinsG.querySelectorAll(".mv-pin:not(.mini)").forEach((g) => pinsG.appendChild(g));
+    }
+    const zoomAt = (f, sx, sy) => {
+      const k2 = clampK(cam.k * f), r = k2 / cam.k;
+      cam.tx = sx - (sx - cam.tx) * r; cam.ty = sy - (sy - cam.ty) * r; cam.k = k2;
+      moving(); req();
     };
-    const zoom = (f, cx, cy) => {
-      const nw = Math.max(home.w * 0.15, Math.min(home.w * 3, v.w * f));
-      const k = nw / v.w;
-      cx = cx ?? v.x + v.w / 2; cy = cy ?? v.y + v.h / 2;
-      v = { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w: v.w * k, h: v.h * k };
-      apply();
+    // حركة ناعمة للكاميرا
+    let anim = 0;
+    const flyTo = (to, ms = 380) => {
+      cancelAnimationFrame(anim);
+      const from = { ...cam }, t0 = performance.now(), ease = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (now) => {
+        const t = Math.min(1, (now - t0) / ms), e = ease(t);
+        cam = { k: from.k + (to.k - from.k) * e, tx: from.tx + (to.tx - from.tx) * e, ty: from.ty + (to.ty - from.ty) * e };
+        moving(); draw();
+        if (t < 1) anim = requestAnimationFrame(step);
+      };
+      anim = requestAnimationFrame(step);
     };
-    const toWorld = (ev) => { const r = svg.getBoundingClientRect(); return [v.x + ((ev.clientX - r.left) / r.width) * v.w, v.y + ((ev.clientY - r.top) / r.height) * v.h]; };
-    svg.addEventListener("wheel", (e) => { e.preventDefault(); const [x, y] = toWorld(e); zoom(e.deltaY > 0 ? 1.15 : 1 / 1.15, x, y); }, { passive: false });
-    let drag = null, moved = false;
-    const pointers = new Map();
-    svg.addEventListener("pointerdown", (e) => { pointers.set(e.pointerId, e); drag = { x: e.clientX, y: e.clientY, v: { ...v } }; moved = false; });
-    svg.addEventListener("pointermove", (e) => {
-      if (!drag) return;
-      if (pointers.size === 2) {
-        const prev = pointers.get(e.pointerId); pointers.set(e.pointerId, e);
-        const [a, b] = [...pointers.values()];
-        const d1 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-        const o = a === e ? b : a; const d0 = Math.hypot(prev.clientX - o.clientX, prev.clientY - o.clientY);
-        if (d0 && d1) zoom(d0 / d1); moved = true; return;
-      }
-      const r = svg.getBoundingClientRect();
-      const dx = ((e.clientX - drag.x) / r.width) * drag.v.w, dy = ((e.clientY - drag.y) / r.height) * drag.v.h;
-      if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 4) moved = true;
-      if (moved && !svg.hasPointerCapture(e.pointerId)) svg.setPointerCapture(e.pointerId);
-      v = { ...v, x: drag.v.x - dx, y: drag.v.y - dy }; apply();
+    const zoomBy = (f) => { const u = usable(), sx = u.x + u.w / 2, sy = u.y + u.h / 2, k2 = clampK(cam.k * f), r = k2 / cam.k; flyTo({ k: k2, tx: sx - (sx - cam.tx) * r, ty: sy - (sy - cam.ty) * r }); };
+
+    // السحب والتكبير بالأصابع مع انزلاق بعد الإفلات
+    const ptrs = new Map();
+    let last = null, moved = false, vel = { x: 0, y: 0, t: 0 }, glide = 0;
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".mv-pin") && e.pointerType === "mouse") { moved = false; return; }
+      cancelAnimationFrame(anim); cancelAnimationFrame(glide);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      last = { x: e.clientX, y: e.clientY }; moved = false; vel = { x: 0, y: 0, t: performance.now() };
     });
-    const end = (e) => { pointers.delete(e.pointerId); if (!pointers.size) drag = null; };
-    svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+    stage.addEventListener("pointermove", (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      const r = stage.getBoundingClientRect();
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        const d0 = Math.hypot(a.x - b.x, a.y - b.y);
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const [a2, b2] = [...ptrs.values()];
+        const d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+        if (d0 > 0) zoomAt(d1 / d0, (a2.x + b2.x) / 2 - r.left, (a2.y + b2.y) / 2 - r.top);
+        moved = true; return;
+      }
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      if (!moved) { moved = true; stage.setPointerCapture(e.pointerId); stage.classList.add("dragging"); }
+      const now = performance.now(), dt = Math.max(1, now - vel.t);
+      vel = { x: dx / dt, y: dy / dt, t: now };
+      cam.tx += dx; cam.ty += dy; last = { x: e.clientX, y: e.clientY };
+      moving(); req();
+    });
+    const up = (e) => {
+      ptrs.delete(e.pointerId);
+      if (ptrs.size === 1) { const [p] = ptrs.values(); last = { ...p }; return; }
+      stage.classList.remove("dragging");
+      if (moved && performance.now() - vel.t < 80 && Math.hypot(vel.x, vel.y) > 0.15) {
+        let vx = vel.x * 16, vy = vel.y * 16;
+        const step = () => { vx *= 0.92; vy *= 0.92; cam.tx += vx; cam.ty += vy; moving(); draw(); if (Math.hypot(vx, vy) > 0.4) glide = requestAnimationFrame(step); };
+        glide = requestAnimationFrame(step);
+      }
+    };
+    stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+    stage.addEventListener("wheel", (e) => { e.preventDefault(); const r = stage.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
     document.querySelector(".mv-ctl").addEventListener("click", (e) => {
       const z = e.target.closest("[data-z]"); if (!z) return;
-      if (z.dataset.z === "in") zoom(1 / 1.35); else if (z.dataset.z === "out") zoom(1.35); else { fit(); apply(); }
+      if (z.dataset.z === "in") zoomBy(1.6); else if (z.dataset.z === "out") zoomBy(1 / 1.6);
+      else { const keep = { ...cam }; fitCam(); const to = { ...cam }; cam = keep; flyTo(to, 450); }
     });
 
     // البطاقة
-    const sheet = document.getElementById("mvSheet");
-    const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
     const paint = () => {
       const it = items.find((i) => i.id === sel);
-      pinsG.querySelectorAll(".mv-pin").forEach((g) => g.classList.toggle("sel", g.dataset.id === sel));
-      declutter(v.w / svg.getBoundingClientRect().width);
+      pinEls.forEach((p) => p.el.classList.toggle("sel", p.it.id === sel));
+      declutter();
       const diff = Math.round(((it.v - avg) / avg) * 100);
       const diffTxt = diff < -3 ? T(`<b>أرخص ${-diff}%</b> من المتوسط`, `<b>${-diff}% cheaper</b> than average`) : diff > 3 ? T(`<b>أغلى ${diff}%</b> من المتوسط`, `<b>${diff}% pricier</b> than average`) : T("<b>قريب من المتوسط</b>", "<b>About average</b>");
       if (!CM) {
@@ -1587,25 +1622,30 @@
       }
       loadPhotos(sheet);
     };
-    pinsG.addEventListener("click", (e) => {
-      const g = e.target.closest(".mv-pin"); if (!g || moved) return;
-      sel = g.dataset.id; store.set("mapSel:" + (cityId || D.id), sel); paint();
-      const it = items.find((i) => i.id === sel);
-      if (window.innerWidth <= 860) { v = { ...v, x: it.x - v.w / 2, y: it.y - v.h * 0.3 }; apply(); }
+    pinsL.addEventListener("click", (e) => {
+      const b = e.target.closest(".mv-pin"); if (!b || moved) return;
+      sel = b.dataset.id; store.set("mapSel:" + (cityId || D.id), sel); paint();
+      const it = items.find((i) => i.id === sel), u = usable(), [x, y] = toScreen(it.x, it.y);
+      if (x < u.x || x > u.x + u.w || y < u.y || y > u.y + u.h) flyTo({ ...cam, tx: cam.tx + (u.x + u.w / 2 - x), ty: cam.ty + (u.y + u.h / 2 - y) });
     });
-    pinsG.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
-    document.querySelector(".mv-chips").addEventListener("click", (e) => {
+    document.getElementById("mvChips").addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.layer) st.layer = b.dataset.layer;
       if (b.dataset.tier) st.tier = b.dataset.tier;
       if (b.hasAttribute("data-stay")) st.stay = st.stay === "apt" ? "hotel" : "apt";
-      save(); window.__mvKeep = { ...v }; render();
+      save(); compute(); paintData(); draw(); paint();
     });
-    fit();
-    if (window.__mvKeep && window.__mvKeepFor === (cityId || D.id)) v = window.__mvKeep;
-    window.__mvKeep = null; window.__mvKeepFor = cityId || D.id;
-    apply(); paint();
-    window.addEventListener("resize", function onR() { if (!document.getElementById("msvg")) return window.removeEventListener("resize", onR); fit(); apply(); });
+
+    paintData();
+    const kept = window.__mvCam && window.__mvCam.for === (cityId || D.id) ? window.__mvCam : null;
+    fitCam();
+    if (kept && kept.base === base) cam = { k: kept.k, tx: kept.tx, ty: kept.ty };
+    draw(); paint();
+    const saveCam = () => { window.__mvCam = { ...cam, base, for: cityId || D.id }; };
+    window.addEventListener("pagehide", saveCam);
+    window.addEventListener("hashchange", function onH() { saveCam(); window.removeEventListener("hashchange", onH); }, { once: true });
+    let rT = 0;
+    window.addEventListener("resize", function onR() { if (!document.body.contains(stage)) return window.removeEventListener("resize", onR); clearTimeout(rT); rT = setTimeout(() => { fitCam(); draw(); }, 120); });
   }
 
   function viewNotFound() {
@@ -1630,6 +1670,12 @@
     bar.classList.toggle("hide", y > lastY && y > 120);
     lastY = y;
   }, { passive: true });
+
+  // ---------- تثبيت الحجم: منع تكبير الصفحة (الخريطة لها تكبيرها الخاص) ----------
+  ["gesturestart", "gesturechange"].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
+  document.addEventListener("touchmove", (e) => { if (e.touches.length > 1 && !e.target.closest(".mv-stage")) e.preventDefault(); }, { passive: false });
+  window.addEventListener("wheel", (e) => { if (e.ctrlKey && !e.target.closest(".mv-stage")) e.preventDefault(); }, { passive: false });
+  document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && ["+", "=", "-", "_", "0"].includes(e.key)) e.preventDefault(); });
 
   // ---------- التوجيه ----------
   function render() {

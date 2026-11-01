@@ -1185,3 +1185,42 @@ body.drawer-on { overflow: hidden; }
 .dc-rows span { display: inline-flex; align-items: center; gap: 6px; background: var(--surface, #fff); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; }
 .dc-rows b { margin-inline-start: 4px; }
 .dc-sum b { color: var(--gold, #e4572e); }
+
+/* ===== محرك الخريطة الخفيف ===== */
+.mv-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; contain: strict; }
+.mv-stage.dragging { cursor: grabbing; }
+.mv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.mv-world svg { display: block; width: 100%; height: 100%; }
+.mapview { background: radial-gradient(120% 90% at 70% 30%, #d5ebe8, #a9d1d0); }
+.mapview.is-city { background: #efe7d6; }
+.mv-pins { position: absolute; inset: 0; pointer-events: none; }
+.mv-pins .mv-pin { position: absolute; left: 0; top: 0; width: 0; height: 0; padding: 0; border: 0; background: none; pointer-events: none; will-change: transform; font-family: "Readex Pro", sans-serif; }
+.mv-pins .pin-in, .mv-pins .pdot { pointer-events: auto; cursor: pointer; }
+.mv-pins .pin-in { position: absolute; left: 0; bottom: 5px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: transform .2s cubic-bezier(.3,1.4,.5,1); transform-origin: 50% 100%; }
+.mv-pins .pb { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; background: #fff; color: #12312f; font-weight: 700; font-size: 13px; border-radius: 999px; padding: 5px 11px 5px 10px; box-shadow: 0 3px 10px rgba(15,61,62,.28); position: relative; }
+.mv-pins .pb::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-bottom: 0; border-top-color: #fff; }
+.mv-pins .pb i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.mv-pins .pn { position: absolute; top: calc(100% + 13px); font-size: 12px; font-weight: 600; color: #0f3d3e; white-space: nowrap; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff; }
+.mv-pins .mv-pin:hover .pin-in, .mv-pins .mv-pin:focus-visible .pin-in { transform: translateX(-50%) scale(1.08); }
+.mv-pins .mv-pin.sel .pin-in { transform: translateX(-50%) scale(1.14); z-index: 2; }
+.mv-pins .mv-pin.sel .pb { background: #0f3d3e; color: #ffcf56; }
+.mv-pins .mv-pin.sel .pb::after { border-top-color: #0f3d3e; }
+.mv-pins .mv-pin.sel { z-index: 5; }
+.mv-pins .pdot { display: none; position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 2px 4px rgba(15,61,62,.35); }
+.mv-pins .mv-pin.mini .pin-in { display: none; }
+.mv-pins .mv-pin.mini .pdot { display: block; }
+.mv-pins .mv-pin.mini:hover .pdot { transform: scale(1.3); }
+@media (max-width: 860px) { .mapview .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255,255,255,.94); } }
+
+/* تثبيت حجم الموقع ومنع التكبير */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
+@media (max-width: 860px) { input, select, textarea { font-size: max(16px, 1em) !important; } }
+.mapview .mv-chip.on { background: #0f3d3e; color: #fff; }
+.mv-pins .mv-pin:not(.mini) { z-index: 3; }
+.mv-pins .mv-pin.sel { z-index: 6; }
+@media (max-width: 860px) {
+  .mv-pins .pb { font-size: 11.5px; padding: 3px 8px; gap: 4px; }
+  .mv-pins .pb i { width: 7px; height: 7px; }
+  .mv-pins .pn { font-size: 11px; top: calc(100% + 10px); }
+  .mv-pins .mv-pin.sel .pin-in { transform: translateX(-50%) scale(1.06); }
+}
