@@ -1146,3 +1146,42 @@ body.drawer-on { overflow: hidden; }
 .drawer-bg { z-index: 199; } .drawer { z-index: 200; }
 [dir="ltr"] .tm-trail { display: none; }
 .tm h1, .tm-lead { text-shadow: 0 2px 4px rgba(0,0,0,.35), 0 6px 24px rgba(11,46,47,.55); }
+
+/* ميزانية الفنادق */
+.hb { margin-top: 14px; padding: 12px; border-radius: 14px; background: #fff7e3; border: 1.5px dashed #e3cf9c; color: #12312f; display: grid; gap: 8px; }
+.hb-t { font-weight: 700; font-size: 14px; }
+.hb-in { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; padding: 4px 12px; box-shadow: inset 0 0 0 1.5px #e3cf9c; }
+.hb-in[hidden] { display: none; }
+.hb-in input { flex: 1; min-width: 0; border: 0; background: none; font: 700 20px "Readex Pro", sans-serif; color: #12312f; padding: 8px 0; outline: none; }
+.hb-in span { font-size: 13px; opacity: .7; }
+.hb .hint { margin: 0; line-height: 1.6; }
+/* كم في اليوم */
+.ts-dbtn { margin-inline-start: auto; order: 9; border: 0; cursor: pointer; background: #f3ead8; color: #12312f; border-radius: 999px; padding: 5px 12px; font: 600 12.5px "Readex Pro", sans-serif; transition: background .2s; }
+.ts-dbtn:hover, .ts-dbtn.on { background: #ffcf56; }
+.ts-day { background: #f8f0de; border-radius: 14px; padding: 12px 14px; display: grid; gap: 9px; animation: dIn .25s ease; }
+.ts-day[hidden] { display: none; }
+@keyframes dIn { from { opacity: 0; transform: translateY(-4px); } }
+.db-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; }
+.db-bar i { display: block; }
+.db-k { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; }
+.db-k span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.db-k span > i, .dc-rows span > i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.db-k b { margin-inline-start: 2px; } .db-k small { opacity: .6; }
+.db-t { font-size: 12.5px; color: #5b6b69; } .db-t b { color: #12312f; }
+.db-own { color: #7a5a00; font-weight: 700; }
+/* مصروف كل يوم في البرنامج */
+.dchart { margin: 18px 0 6px; background: var(--surface-2, #f3ead8); border-radius: 18px; padding: 16px 18px; }
+.dchart h3 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: baseline; gap: 10px; }
+.dchart h3 small { font-size: 12px; opacity: .65; font-weight: 400; }
+.dc-cols { display: flex; align-items: flex-end; gap: 6px; height: 120px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.dc-col { flex: 1 0 26px; max-width: 90px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer; padding: 0; color: inherit; font: inherit; }
+.dc-stack { width: 100%; display: flex; flex-direction: column-reverse; border-radius: 7px 7px 3px 3px; overflow: hidden; opacity: .55; transition: opacity .2s, transform .2s; }
+.dc-stack i { display: block; }
+.dc-col:hover .dc-stack { opacity: .85; }
+.dc-col.on .dc-stack { opacity: 1; transform: scaleX(1.08); box-shadow: 0 0 0 2px var(--gold, #ffcf56); }
+.dc-col small { font-size: 11px; opacity: .7; } .dc-col.on small { opacity: 1; font-weight: 800; color: var(--gold, #ffcf56); }
+.dc-info { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line, #dccfb2); font-size: 13.5px; display: grid; gap: 8px; }
+.dc-rows { display: flex; flex-wrap: wrap; gap: 8px; }
+.dc-rows span { display: inline-flex; align-items: center; gap: 6px; background: var(--surface, #fff); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; }
+.dc-rows b { margin-inline-start: 4px; }
+.dc-sum b { color: var(--gold, #e4572e); }

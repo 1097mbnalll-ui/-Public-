@@ -783,8 +783,8 @@
     return `<span class="book-links"><a href="${b}" target="_blank" rel="noopener">Booking ↗</a><a href="${a}" target="_blank" rel="noopener">Airbnb ↗</a></span>`;
   }
 
-  function planRoute(route, { days, tier, tiers, stay = "hotel", interests, travelers }) {
-    tiers = tiers || { hotel: tier, food: tier, transport: tier };
+  function planRoute(route, { days, tier, tiers, stay = "hotel", interests, travelers, hotelNight = 0 }) {
+    tiers = { ...(tiers || { hotel: tier, food: tier, transport: tier }) };
     if (route.reduce((s, c) => s + c.days.min, 0) > days) return null;
     const alloc = new Map(route.map((c) => [c, c.days.min]));
     let left = days - route.reduce((s, c) => s + c.days.min, 0);
@@ -798,7 +798,11 @@
     }
     if (left > 0) alloc.set(byScore[0], alloc.get(byScore[0]) + left);
 
-    const rooms = Math.ceil(travelers / 2);
+    // ميزانية فنادق يحددها المستخدم: سعر ثابت لليلة لكل المجموعة، ونعرض أقرب مستوى يقابله
+    if (hotelNight > 0) {
+      const nightsAt = (t) => route.reduce((a, c) => a + lodging(c, t, stay, travelers) * alloc.get(c), 0) / days;
+      tiers.hotel = ["lux", "mid", "eco"].find((t) => nightsAt(t) <= hotelNight * 1.05) || "eco";
+    }
     const plan = [];
     let dayNo = 0, fees = 0, food = 0, local = 0, inter = 0, hotel = 0;
     route.forEach((c, ci) => {
@@ -811,7 +815,7 @@
       for (let d = 0; d < n; d++) {
         dayNo++;
         const last = dayNo === days;
-        let slots = 2;
+        let slots = 2, dayFees = 0;
         const items = [];
         if (d === 0 && tr) slots = tr.hours > 5 ? 0 : tr.hours > 2.5 ? 1 : 1;
         if (d === 0 && ci === 0) { items.push({ t: T("الوصول والاستقرار في الفندق", "Arrive and check in"), k: "in" }); slots = 1; }
@@ -821,15 +825,17 @@
           if (k < 0) break;
           const p = pool.splice(k, 1)[0];
           slots -= slotsOf(p);
-          fees += p.fee;
+          fees += p.fee; dayFees += p.fee;
           items.push({ p });
         }
         if (slots > 0 && !items.length) items.push({ t: T("يوم حر: تسوق وراحة وتجربة أكل محلي", "Free day: shopping, rest and local food"), k: "free" });
         if (last) items.push({ t: T("المغادرة", "Departure"), k: "out" });
-        plan.push({ day: dayNo, city: c, items, travel: d === 0 && tr ? { from: route[ci - 1], ...tr } : null, newCity: d === 0 });
+        const night = last ? 0 : hotelNight > 0 ? hotelNight : lodging(c, tiers.hotel, stay, travelers);
+        const cost = { hotel: night, food: c.costs.food[tiers.food] * travelers, local: c.costs.transport[tiers.transport] * travelers, fees: dayFees * travelers, inter: d === 0 && tr ? tr.cost[tiers.transport] * travelers : 0 };
+        plan.push({ day: dayNo, city: c, items, travel: d === 0 && tr ? { from: route[ci - 1], ...tr } : null, newCity: d === 0, cost });
         food += c.costs.food[tiers.food];
         local += c.costs.transport[tiers.transport];
-        if (!last) hotel += lodging(c, tiers.hotel, stay, travelers);
+        hotel += night;
       }
     });
     const parts = {
@@ -837,7 +843,7 @@
       visa: D.visaSAR * D.currency.perSAR * travelers,
       flights: 0,
     };
-    return { route, alloc, plan, parts, tier: tier || tiers.hotel, tiers, stay };
+    return { route, alloc, plan, parts, tier: tier || tiers.hotel, tiers, stay, hotelNight };
   }
   const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.flightSAR * D.currency.perSAR * travelers : 0);
 
@@ -867,6 +873,13 @@
     return out;
   }
 
+  // سعر الليلة المحدد من المستخدم بالعملة المحلية (لكل المجموعة)، أو 0 = تلقائي
+  function hotelNightOf(s) {
+    const p = s.prefs || {};
+    if (!p.hotelMode || p.hotelMode === "auto" || !(p.hotelSAR > 0)) return 0;
+    const v = p.hotelSAR * D.currency.perSAR;
+    return p.hotelMode === "total" ? v / Math.max(1, s.days - 1) : v;
+  }
   function buildOptions(s) {
     const budget = s.budget;
     const fits = [], over = [];
@@ -874,14 +887,15 @@
       // كل مستوى يناسب الميزانية خيار مستقل
       // كل بند (سكن، أكل، تنقل) إما محدد من المستخدم أو تلقائي يتغير مع المستوى
       const pref = s.prefs || {};
+      const hotelNight = hotelNightOf(s);
       let cheapest = null, any = false;
       const tried = new Set();
       for (const tier of ["lux", "mid", "eco"]) {
         const tiers = Object.fromEntries(PREF_KEYS.map((k) => [k, pref[k] && pref[k] !== "auto" ? pref[k] : tier]));
-        const key = PREF_KEYS.map((k) => tiers[k]).join("-");
+        const key = PREF_KEYS.map((k) => (k === "hotel" && hotelNight ? "custom" : tiers[k])).join("-");
         if (tried.has(key)) continue;
         tried.add(key);
-        const r = planRoute(route, { ...s, tier, tiers, stay: pref.stay || "hotel" });
+        const r = planRoute(route, { ...s, tier, tiers, stay: pref.stay || "hotel", hotelNight });
         if (!r) break;
         r.total = totalOf(r, s.flights, s.travelers);
         cheapest = r;
@@ -977,6 +991,12 @@
               ${[["hotel", T("🏨 السكن", "🏨 Stay")], ["food", T("🍽️ الأكل", "🍽️ Food")], ["transport", T("🚕 التنقل", "🚕 Getting around")]].map(([k, lbl]) => `
               <div class="pref-row"><span>${lbl}</span><div class="seg mini">${["auto", "eco", "mid", "lux"].map((t) => `<label><input type="radio" name="p_${k}" value="${t}" ${(s.prefs && s.prefs[k] || "auto") === t ? "checked" : ""}><span>${t === "auto" ? T("تلقائي", "Auto") : D.tiers[t].name}</span></label>`).join("")}</div></div>`).join("")}
               <div class="pref-row"><span>${T("نوع السكن", "Stay type")}</span><div class="seg mini">${[["hotel", T("فندق", "Hotel")], ["apt", T("شقة Airbnb", "Airbnb flat")], ["room", T("غرفة Airbnb", "Airbnb room")]].map(([v, l]) => `<label><input type="radio" name="p_stay" value="${v}" ${(s.prefs && s.prefs.stay || "hotel") === v ? "checked" : ""}><span>${l}</span></label>`).join("")}</div></div>
+              <div class="hb">
+                <span class="hb-t">💰 ${T("ميزانية الفنادق", "Hotel budget")}</span>
+                <div class="seg mini">${[["auto", T("تلقائي", "Auto")], ["night", T("سعر الليلة", "Per night")], ["total", T("للرحلة كاملة", "Whole trip")]].map(([v, l]) => `<label><input type="radio" name="p_hmode" value="${v}" ${((s.prefs && s.prefs.hotelMode) || "auto") === v ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>
+                <div class="hb-in" id="hbIn"><input inputmode="numeric" id="hotelAmt" value="${s.prefs && s.prefs.hotelSAR ? fmt(Math.round((s.prefs.hotelSAR * D.currency.perSAR) / rate())) : ""}" placeholder="${T("مثلًا", "e.g.")} ${fmt(Math.round((D.cities[0].costs.hotel.mid * Math.ceil(s.travelers / 2)) / rate()))}"><span>${curName()}</span></div>
+                <small class="hint" id="hbHint"></small>
+              </div>
               <small class="hint">${T("التلقائي يختار لك أفضل مستوى تكفيه ميزانيتك. أسعار Airbnb تقديرية.", "Auto picks the best level your budget allows. Airbnb prices are estimates.")}</small>
             </div>
             <div class="field">
@@ -1032,10 +1052,28 @@
         food: form.querySelector("input[name=p_food]:checked").value,
         transport: form.querySelector("input[name=p_transport]:checked").value,
         stay: form.querySelector("input[name=p_stay]:checked").value,
+        hotelMode: form.querySelector("input[name=p_hmode]:checked").value,
+        hotelSAR: (parseFloat(document.getElementById("hotelAmt").value.replace(/[^\d.]/g, "")) || 0) * rate() / D.currency.perSAR,
       },
     }; };
+    const hbHint = () => {
+      const st = read(), m = st.prefs.hotelMode;
+      document.getElementById("hbIn").hidden = m === "auto";
+      const typical = (t) => D.cities.reduce((a, c) => a + lodging(c, t, st.prefs.stay, st.travelers), 0) / D.cities.length;
+      const hn = hotelNightOf(st);
+      let txt = "";
+      if (m === "auto") txt = T(`نختار لك الفندق حسب ميزانيتك. المتوسط هنا لليلة: ${D.tiers.eco.name} ${money(typical("eco"))} · ${D.tiers.mid.name} ${money(typical("mid"))} · ${D.tiers.lux.name} ${money(typical("lux"))}`, `We pick hotels to fit your budget. Typical night here: ${D.tiers.eco.name} ${money(typical("eco"))} · ${D.tiers.mid.name} ${money(typical("mid"))} · ${D.tiers.lux.name} ${money(typical("lux"))}`);
+      else if (!hn) txt = T("اكتب المبلغ لكل الغرف.", "Enter the amount for all rooms.");
+      else {
+        const lvl = ["lux", "mid", "eco"].find((t) => typical(t) <= hn * 1.05);
+        txt = (m === "total" ? T(`يعني ${money(hn)} لليلة (${st.days - 1} ليالي). `, `That's ${money(hn)} a night (${st.days - 1} nights). `) : T(`يعني ${money(hn * (st.days - 1))} للرحلة كاملة. `, `That's ${money(hn * (st.days - 1))} for the whole trip. `))
+          + (lvl ? T(`يكفي غالبًا فندق ${D.tiers[lvl].name}.`, `Usually enough for a ${D.tiers[lvl].name} hotel.`) : T(`أقل من أرخص فندق هنا (${money(typical("eco"))} لليلة)، جرّب غرفة Airbnb.`, `Below the cheapest hotels here (${money(typical("eco"))} a night) — try an Airbnb room.`));
+      }
+      document.getElementById("hbHint").textContent = txt;
+    };
     const update = (now) => {
       const st = read();
+      hbHint();
       document.getElementById("daysOut").textContent = dayWord(st.days);
       document.getElementById("trOut").textContent = paxWord(st.travelers);
       savePlan(st);
@@ -1059,6 +1097,33 @@
     }));
     form.querySelectorAll("[data-b]").forEach((b) => b.addEventListener("click", () => { budgetIn.value = fmt(+b.dataset.b); update(true); }));
     update(true);
+  }
+
+  // تفصيل المصروف اليومي: متوسط اليوم بشريط ملون، بدون زحمة
+  const DCOL = { hotel: ["🏨", "#0f3d3e", () => T("السكن", "Stay")], food: ["🍽️", "#e4572e", () => T("الأكل", "Food")], local: ["🚕", "#ffcf56", () => T("التنقل", "Getting around")], fees: ["🎟️", "#3aa57a", () => T("الدخول", "Entry fees")], inter: ["🚐", "#7a5a9e", () => T("بين المدن", "Between cities")] };
+  function dayBox(r, s) {
+    const n = r.plan.length, nights = Math.max(1, n - 1);
+    const avg = { hotel: r.parts.hotel / nights, food: r.parts.food / n, local: r.parts.local / n, fees: r.parts.fees / n, inter: r.parts.inter / n };
+    const keys = Object.keys(avg).filter((k) => avg[k] > 0.5);
+    const sum = keys.reduce((a, k) => a + avg[k], 0);
+    return `<div class="db-bar">${keys.map((k) => `<i style="flex:${avg[k]};background:${DCOL[k][1]}"></i>`).join("")}</div>
+      <div class="db-k">${keys.map((k) => `<span><i style="background:${DCOL[k][1]}"></i>${DCOL[k][0]} ${DCOL[k][2]()} <b>${money(avg[k])}</b>${k === "hotel" ? `<small>/${T("ليلة", "night")}</small>` : ""}</span>`).join("")}</div>
+      <div class="db-t">${T("اليوم تقريبًا", "A typical day")} <b>${money(sum)}</b> ${T("للمجموعة", "for the group")} · <b>${money(sum / s.travelers)}</b> ${T("للشخص", "pp")}${r.hotelNight ? ` · <span class="db-own">💰 ${T("بميزانية فنادقك", "your hotel budget")}</span>` : ""}</div>`;
+  }
+  function dayChart(r, s) {
+    const tot = (d) => Object.values(d.cost).reduce((a, b) => a + b, 0);
+    const mx = Math.max(...r.plan.map(tot)) || 1;
+    return `<section class="dchart">
+      <h3>🧾 ${T("مصروف كل يوم", "Day-by-day spending")} <small>${T("اضغط على أي يوم", "Tap any day")}</small></h3>
+      <div class="dc-cols">${r.plan.map((d, i) => `<button type="button" class="dc-col ${i ? "" : "on"}" data-dc="${i}" aria-label="${T("اليوم", "Day")} ${d.day}: ${money(tot(d))}"><span class="dc-stack" style="height:${Math.max(8, (tot(d) / mx) * 100)}%">${Object.keys(DCOL).filter((k) => d.cost[k] > 0).map((k) => `<i style="flex:${d.cost[k]};background:${DCOL[k][1]}"></i>`).join("")}</span><small>${d.day}</small></button>`).join("")}</div>
+      <div class="dc-info" id="dcInfo"></div>
+    </section>`;
+  }
+  function dayInfo(r, s, i) {
+    const d = r.plan[i], t = Object.values(d.cost).reduce((a, b) => a + b, 0);
+    return `<b>${T("اليوم", "Day")} ${d.day}${s.startDate ? ` · ${niceDate(addDays(s.startDate, d.day - 1))}` : ""} · ${esc(d.city.short)}</b>
+      <div class="dc-rows">${Object.keys(DCOL).filter((k) => d.cost[k] > 0).map((k) => `<span><i style="background:${DCOL[k][1]}"></i>${DCOL[k][0]} ${DCOL[k][2]()}<b>${money(d.cost[k])}</b></span>`).join("")}</div>
+      <div class="dc-sum">${T("المجموع", "Total")} <b>${money(t)}</b> · ${money(t / s.travelers)} ${T("للشخص", "pp")}${d.cost.hotel ? "" : ` · ${T("بدون فندق (يوم المغادرة)", "no hotel (departure day)")}`}</div>`;
   }
 
   let lastOptions = [];
@@ -1127,7 +1192,8 @@
       const hops = r.plan.filter((d) => d.newCity && d.travel).map((d) => d.travel);
       return `<article class="tstrip ${isOver ? "over" : ""}">
         <div class="ts-m">
-          <div class="ts-top"><b>${fltNo(r)}</b><span class="ts-cls t-${sameTiers(r.tiers) ? r.tier : "mix"}">${tiersLabel(r.tiers, true)}</span><span>· ${stopsTxt(r.route.length)} · ${dayWord(s.days)}</span></div>
+          <div class="ts-top"><button type="button" class="ts-dbtn" data-day="${i}" aria-expanded="false">🧾 ${T("كم في اليوم؟", "Per day?")}</button><b>${fltNo(r)}</b><span class="ts-cls t-${sameTiers(r.tiers) ? r.tier : "mix"}">${tiersLabel(r.tiers, true)}</span><span>· ${stopsTxt(r.route.length)} · ${dayWord(s.days)}</span></div>
+          <div class="ts-day" hidden>${dayBox(r, s)}</div>
           <div class="ts-path">${r.route.map((c, k) => `${k ? `<div class="ts-hop">${arc}<span>${hops[k - 1] ? hopText(hops[k - 1]) : ""}</span></div>` : ""}<a class="ts-city" href="${B()}/city/${c.id}"><span class="ts-ph">${cityScene(c, true)}</span><b>${esc(c.short)}</b><small>${dayWord(r.alloc.get(c))}</small></a>`).join("")}${r.route.length === 1 ? `<div class="ts-solo">${T(`${dayWord(s.days)} على راحتك في مكان واحد، بدون تنقلات.`, `${dayWord(s.days)} in one place — no packing and moving.`)}</div>` : ""}</div>
         </div>
         <div class="ts-s">
@@ -1183,6 +1249,10 @@
     resEl.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => { optUI[b.dataset.f] = b.dataset.v; optUI.shown = 10; renderOptions(s); }));
     const sb = resEl.querySelector("[data-sort]");
     sb && sb.addEventListener("click", () => { const k = Object.keys(SORTS); optUI.sort = k[(k.indexOf(optUI.sort) + 1) % k.length]; renderOptions(s); });
+    resEl.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => {
+      const box = b.closest(".tstrip").querySelector(".ts-day"), open = box.hidden;
+      box.hidden = !open; b.setAttribute("aria-expanded", open); b.classList.toggle("on", open);
+    }));
     const mb = resEl.querySelector("[data-more]");
     mb && mb.addEventListener("click", () => { optUI.shown += 10; renderOptions(s); });
   }
@@ -1248,7 +1318,8 @@
           <div>${T("رسوم الأماكن", "Entry fees")}<b>${money(p.fees)}</b></div>
           <div>${T("التأشيرة", "Visa")}${s.flights ? T(" والطيران", " & flights") : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
         </div>
-        <p class="hint">${sameTiers(r.tiers) ? D.tiers[r.tier].desc + ". " : ""}${r.stay === "apt" ? T("السكن شقة Airbnb كاملة لكل 4 أشخاص (سعر تقديري).", "Lodging is a whole Airbnb apartment per 4 people (estimated price).") : r.stay === "room" ? T("السكن غرفة خاصة في Airbnb لكل شخصين (سعر تقديري).", "Lodging is a private Airbnb room per 2 people (estimated price).") : T("السكن غرفة فندقية لكل شخصين.", "Hotels assume one room per two travellers.")} ${T("الأسعار تقريبية، وتقدر تشوف السعر الحقيقي من روابط Booking وAirbnb في كل وجهة.", "Prices are estimates — check live prices with the Booking and Airbnb links for each stop.")}</p>
+        ${dayChart(r, s)}
+        <p class="hint">${r.hotelNight ? T(`💰 السكن حسب ميزانيتك: ${money(r.hotelNight)} لليلة. `, `💰 Hotels use your budget: ${money(r.hotelNight)} a night. `) : ""}${sameTiers(r.tiers) ? D.tiers[r.tier].desc + ". " : ""}${r.stay === "apt" ? T("السكن شقة Airbnb كاملة لكل 4 أشخاص (سعر تقديري).", "Lodging is a whole Airbnb apartment per 4 people (estimated price).") : r.stay === "room" ? T("السكن غرفة خاصة في Airbnb لكل شخصين (سعر تقديري).", "Lodging is a private Airbnb room per 2 people (estimated price).") : T("السكن غرفة فندقية لكل شخصين.", "Hotels assume one room per two travellers.")} ${T("الأسعار تقريبية، وتقدر تشوف السعر الحقيقي من روابط Booking وAirbnb في كل وجهة.", "Prices are estimates — check live prices with the Booking and Airbnb links for each stop.")}</p>
         <div class="trip">
           <div class="legs">${days}</div>
           <div class="map">${mapSVG(r.route, { animate: true })}</div>
@@ -1256,6 +1327,10 @@
         <div class="actions no-print"><button class="btn" type="button" onclick="window.print()">${T("اطبع الخطة أو احفظها PDF", "Print or save as PDF")}</button></div>
       </div>`;
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    const info = dlg.querySelector("#dcInfo");
+    const pick = (i) => { info.innerHTML = dayInfo(r, s, i); dlg.querySelectorAll(".dc-col").forEach((b) => b.classList.toggle("on", +b.dataset.dc === i)); };
+    dlg.querySelectorAll(".dc-col").forEach((b) => b.addEventListener("click", () => pick(+b.dataset.dc)));
+    pick(0);
     loadPhotos(dlg);
   }
 
