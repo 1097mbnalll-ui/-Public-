@@ -20,6 +20,8 @@ addEN("thailand", {
         ["Safari World", "A drive-through safari plus animal shows. Price is approximate."],
         ["Damnoen Saduak Floating Market", "Boats piled with fruit and food, 90 minutes from Bangkok. Boat price is approximate."],
         ["Mahanakhon SkyWalk", "A glass floor on the 78th floor. Price is approximate."],
+        ["Loha Prasat (Wat Ratchanatdaram)", "A one-of-a-kind temple of 37 metal spires, with corridors spiralling up to a rooftop view of the old city — near the Grand Palace, without the crush."],
+        ["Bang Krachao (the Green Lung)", "A green island in the middle of Bangkok: cycle raised paths through orchards and mangroves. One short boat ride and you're in the countryside."],
       ],
     },
     phuket: {
@@ -35,6 +37,7 @@ addEN("thailand", {
         ["Big Buddha", "A 45-metre white statue on a hilltop."],
         ["Phuket Old Town", "Colourful Sino-Portuguese shophouses and cafés."],
         ["Promthep Cape", "The island's most famous sunset spot."],
+        ["Ko Yao Noi", "A peaceful, mostly Muslim island between Phuket and Krabi with jaw-dropping views of Phang Nga Bay's karsts. Small boat fee."],
       ],
     },
     krabi: {
@@ -49,6 +52,7 @@ addEN("thailand", {
         ["Four Islands tour", "Poda, Tup and the sandbar that links the islands at low tide. Price is approximate."],
         ["Tiger Cave Temple", "1,260 steps to a summit temple with an unreal view."],
         ["Ao Nang Beach", "The main beach and the starting point for tours."],
+        ["Khao Sok National Park", "One of the world's oldest rainforests and an emerald lake among limestone peaks, where you can sleep in floating bungalows. 2.5 hours from Krabi."],
       ],
     },
     chiangmai: {
@@ -65,6 +69,7 @@ addEN("thailand", {
         ["Doi Inthanon National Park", "Thailand's highest mountain, waterfalls and two royal pagodas."],
         ["Night Bazaar", "Crafts and street food every night."],
         ["The White Temple (Chiang Rai)", "A dreamlike all-white temple, 3 hours from Chiang Mai."],
+        ["Chiang Dao Cave & Mountain", "A long cave of shrines and statues beneath a mountain that rises out of the clouds — 90 minutes from Chiang Mai, surrounded by quiet villages."],
       ],
     },
     pattaya: {
@@ -109,6 +114,7 @@ addEN("georgia", {
         ["Mtatsminda Park", "An amusement park on a mountaintop, reached by funicular."],
         ["Georgian National Museum", "Colchian gold and the story of the Caucasus."],
         ["Rustaveli Avenue", "The main boulevard of theatres and cafés."],
+        ["Uplistsikhe Cave Town", "A 3,000-year-old Silk Road town carved into rock — streets, halls and even a theatre. 90 minutes from Tbilisi."],
       ],
     },
     kazbegi: {
@@ -124,6 +130,7 @@ addEN("georgia", {
         ["Ananuri Fortress", "A castle above a turquoise lake, on the way up."],
         ["Gudauri & the Friendship Monument", "A colourful panoramic lookout over the valleys — and a ski resort in winter."],
         ["Truso Valley", "A valley of colourful mineral springs."],
+        ["Juta Valley", "A mountain valley beneath the jagged Chaukhi peaks, with meadows and a turquoise lake — one of the Caucasus' most beautiful walks, and quieter than Gergeti."],
       ],
     },
     batumi: {
@@ -139,6 +146,7 @@ addEN("georgia", {
         ["Botanical Garden", "Gardens on the cliffs above the sea. Price is approximate."],
         ["Alphabetic Tower", "A tower spelling out the Georgian alphabet, with a revolving restaurant."],
         ["Gonio Fortress", "A Roman fortress near the Turkish border."],
+        ["Mtirala National Park", "Rainforest just 30 minutes from Batumi, with waterfalls, trails and a lake. Price is approximate."],
       ],
     },
     borjomi: {
@@ -186,6 +194,7 @@ addEN("azerbaijan", {
         ["Bibi-Heybat Mosque", "A three-domed mosque by the sea."],
         ["Yanar Dag (Burning Mountain)", "A natural gas fire that has burned for millennia. Price is approximate."],
         ["Gobustan & mud volcanoes", "40,000-year-old rock carvings and bubbling mud volcanoes. Price is approximate."],
+        ["Ateshgah Fire Temple", "An old temple built by Indian merchants on the Silk Road over a natural gas flame, now a museum. Price is approximate."],
       ],
     },
     gabala: {
@@ -200,6 +209,7 @@ addEN("azerbaijan", {
         ["Nohur Lake", "A calm lake among the mountains."],
         ["Yeddi Gozel Waterfall", "A tiered waterfall in the forest."],
         ["Gabaland", "A family amusement park. Price is approximate."],
+        ["Lahij Village", "A mountain village of cobbled lanes, famous for its coppersmiths for centuries — watch them hammer away by hand."],
       ],
     },
     shahdag: {
@@ -213,6 +223,7 @@ addEN("azerbaijan", {
         ["Shahdag Mountain Resort", "Lifts and skiing in winter, trails in summer. Price is approximate."],
         ["Khinalug village", "One of the highest and oldest inhabited villages in the Caucasus."],
         ["Afurja Waterfall", "A tall waterfall in the forest near Quba."],
+        ["Red Settlement (Qırmızı Qəsəbə)", "A unique little red-brick town on the river near Quba, with a history unlike anywhere else in the region."],
       ],
     },
     sheki: {

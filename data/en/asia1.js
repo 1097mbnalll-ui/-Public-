@@ -25,6 +25,9 @@ addEN("turkey", {
         ["Çamlıca Mosque", "Türkiye's largest mosque, on a hilltop above the city."],
         ["Princes' Islands", "Car-free islands of bicycles and old wooden mansions, 90 minutes by ferry. Price is approximate."],
         ["İstiklal Avenue & Taksim Square", "A long pedestrian street with the red nostalgic tram, shops and sweet shops."],
+        ["Rüstem Pasha Mosque", "A small mosque hidden above the Spice Bazaar shops, every wall covered in blue and red İznik tiles — many say finer than the Blue Mosque's, with a fraction of the crowds."],
+        ["Balat & Fener", "Old Golden Horn neighbourhoods of colourful houses, stone stairways and tiny cafés, dotted with historic churches and schools — the real Istanbul, away from the crowds."],
+        ["Kariye Mosque (Chora)", "Home to some of the world's finest Byzantine mosaics and frescoes, glowing in gold. Foreign-visitor price is approximate."],
       ],
     },
     cappadocia: {
@@ -43,6 +46,8 @@ addEN("turkey", {
         ["Red Valley at sunset", "A hiking trail or ATV ride among rose-coloured rocks."],
         ["Ihlara Valley", "A deep green canyon with a river and rock-cut churches. Price is approximate."],
         ["Avanos pottery workshops", "A town on the Kızılırmak river, famous for pottery since Hittite times."],
+        ["Soğanlı Valley", "A quiet valley of rock-cut churches and a village famous for its rag dolls, with barely a tourist in sight — Göreme before the crowds. Price is approximate."],
+        ["Selime Monastery", "Cappadocia's largest rock-cut monastery — halls, a cathedral and stables carved into a cliff. It has even starred in films. Price is approximate."],
       ],
     },
     antalya: {
@@ -61,6 +66,8 @@ addEN("turkey", {
         ["Aspendos Theatre", "The best-preserved Roman theatre in the world. Price is approximate."],
         ["Tahtalı cable car", "Up to a 2,365 m summit with sea views. Price is approximate."],
         ["The Land of Legends", "A huge theme park and water park in Belek. Price is approximate."],
+        ["Termessos", "An ancient city 1,000 m up a mountain that even Alexander the Great couldn't take. Its theatre hangs over the valleys in a pine forest. Price is approximate."],
+        ["Köprülü Canyon", "A green river canyon with an ancient Roman bridge and family-friendly rafting on clear water, 90 minutes from Antalya."],
       ],
     },
     trabzon: {
@@ -92,6 +99,7 @@ addEN("turkey", {
         ["Green Mosque", "Decorated in green and blue tiles from the 15th century."],
         ["Cumalıkızık village", "A 700-year-old Ottoman village of colourful houses and village breakfasts."],
         ["Koza Han (Silk Market)", "A caravanserai from 1491 with silk shops and courtyard cafés."],
+        ["İznik (Nicaea)", "A historic lakeside town ringed by Roman walls, birthplace of the famous İznik tiles — visit the workshops and buy straight from the makers."],
       ],
     },
   },
@@ -125,6 +133,7 @@ addEN("malaysia", {
         ["Bukit Bintang", "Malls, plus Jalan Alor for street food."],
         ["Central Market", "Malaysian crafts and souvenirs in an Art Deco hall."],
         ["Aquaria KLCC", "An aquarium with an underwater glass tunnel. Price is approximate."],
+        ["FRIM Forest & Canopy Walk", "Rainforest inside KL's city limits, with a walkway above the treetops and little waterfalls — a green escape few visitors know. Price is approximate."],
       ],
     },
     putrajaya: {
@@ -182,6 +191,7 @@ addEN("malaysia", {
         ["Kek Lok Si Temple", "Malaysia's largest Buddhist temple."],
         ["Batu Ferringhi Beach", "Beach, resorts and a night market."],
         ["Gurney Drive hawkers", "The most famous seaside street-food court."],
+        ["Penang National Park", "Jungle trails to secluded beaches like Monkey Beach and Turtle Beach, plus an old lighthouse. A small boat fee gets you back."],
       ],
     },
     langkawi: {
@@ -242,6 +252,7 @@ addEN("indonesia", {
         ["Garuda Wisnu Kencana", "One of the tallest statues in the world, with cultural shows. Price is approximate."],
         ["Waterbom Bali", "One of the best water parks in Asia. Price is approximate."],
         ["Jimbaran seafood dinner", "Tables on the sand and grilled fish at sunset."],
+        ["Tirta Gangga Water Palace", "A royal water palace of gardens and koi ponds where you hop across stepping stones — in calm East Bali, far from the crowds."],
       ],
     },
     ubud: {
@@ -258,6 +269,7 @@ addEN("indonesia", {
         ["Mount Batur sunrise", "A night hike up a volcano for sunrise above the clouds. Tour price is approximate."],
         ["Ubud Palace", "A royal palace with evening dance performances."],
         ["Goa Gajah", "The ancient Elephant Cave with its carved entrance."],
+        ["Jatiluwih Rice Terraces", "Vast UNESCO-listed rice terraces — far bigger and calmer than Tegallalang, with Mount Batukaru behind. Price is approximate."],
       ],
     },
     jakarta: {
@@ -301,6 +313,8 @@ addEN("indonesia", {
         ["Sultan's Palace (Kraton)", "The residence of the reigning Sultan of Yogyakarta. Price is approximate."],
         ["Malioboro Street", "The city's famous shopping and street-food strip."],
         ["Merapi volcano jeep tour", "A ride through the aftermath of Indonesia's most active volcano. Price is approximate."],
+        ["Ratu Boko at sunset", "Hilltop ruins of an ancient palace and Yogyakarta's finest sunset, looking out over Prambanan. Price is approximate."],
+        ["Plaosan Temple", "Finely carved twin temples close to Prambanan, with hardly any visitors. Price is approximate."],
       ],
     },
     lombok: {

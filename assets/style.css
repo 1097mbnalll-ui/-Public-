@@ -834,3 +834,9 @@ footer .logo .logo-mark { width: 34px; height: 34px; }
 footer .wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .app-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; color: var(--cream); border: 1.5px dashed rgba(246,239,226,.5); padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: .92rem; }
 .app-chip:hover { border-color: var(--gold); color: var(--gold); }
+
+/* الجواهر المخفية */
+.pcard { position: relative; }
+.gem-badge { position: absolute; top: 12px; inset-inline-start: 12px; z-index: 2; background: #12312f; color: #ffcf56; font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 3px; box-shadow: 0 4px 10px rgba(0,0,0,.3); transform: rotate(-3deg); }
+.gem-line { color: #b7791f; font-weight: 600; margin: -2px 0 10px; }
+.gems-band .band-head h2 { color: var(--gold); }

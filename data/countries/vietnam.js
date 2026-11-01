@@ -95,6 +95,7 @@ const VN = {
         { wiki: "Long Biên Bridge", name: "جسر لونغ بيين", type: "history", fee: 0, time: "ساعة", desc: "جسر حديدي من 1903 صممه نفس مكتب برج إيفل. تمشي عليه وتشوف النهر الأحمر والقطارات.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Đồng Xuân Market", name: "سوق دونغ شوان", type: "food", fee: 0, time: "ساعتين", desc: "أكبر سوق مغطى في هانوي، كل شي من الأقمشة للتوابل، وحوله أكل شارع.", src: "wikivoyage", date: "2026-11" },
         { wiki: "West Lake (Hanoi)", name: "البحيرة الغربية (هو تاي)", type: "nature", fee: 0, time: "نصف يوم", desc: "أكبر بحيرة في هانوي، فيها ممشى ودراجات ومقاهي على الموية، أهدأ من وسط المدينة.", src: "wikivoyage", date: "2026-11" },
+        { wiki: "Đường Lâm", gem: true, name: "قرية دوونغ لام القديمة", type: "history", fee: 20000, time: "نصف يوم", desc: "قرية عمرها أكثر من ألف سنة ببيوت من حجر اللاتيريت الأحمر وبوابات قديمة. هانوي زمان بدون زحمة، ساعة من المدينة.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: {
         mosques: [
@@ -148,6 +149,7 @@ const VN = {
         { wiki: "Cát Bà National Park", name: "الحديقة الوطنية في كات با", type: "nature", fee: 80000, time: "نصف يوم", desc: "غابة استوائية ومسار صعود لقمة فيها إطلالة على الجزيرة كلها. السعر تقريبي.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Thiên Cung Cave", name: "كهف ثيين كونغ", type: "nature", fee: 0, time: "ساعة", desc: "كهف مضاء بألوان، صواعده تشبه القصور. داخل في أغلب برامج القوارب.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Hạ Long", name: "تلفريك الملكة وصن وورلد", type: "fun", fee: 350000, time: "نصف يوم", desc: "تلفريك فوق الخليج لعجلة دوّارة كبيرة وحديقة ألعاب في مدينة ها لونغ. السعر تقريبي.", src: "booking", date: "2026-11" },
+        { wiki: "Bái Tử Long Bay", gem: true, name: "خليج باي تو لونغ", type: "nature", fee: 0, time: "يوم كامل", desc: "امتداد ها لونغ الشرقي: نفس الجبال الكلسية، لكن قوارب قليلة جدًا وطبيعة بكر. السعر ضمن جولة القارب.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: {
         mosques: [],
@@ -198,6 +200,7 @@ const VN = {
         { wiki: "Mỹ Sơn", name: "معابد ماي سون", type: "history", fee: 150000, time: "نصف يوم", desc: "أطلال معابد هندوسية لمملكة الشام بين الغابات، من التراث العالمي. ساعة من هوي آن.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Han Market", name: "سوق هان", type: "food", fee: 0, time: "ساعتين", desc: "سوق دا نانغ الشعبي للأكل والملابس والتذكارات، جنب نهر هان.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Hội An", name: "قوارب السلال في كام ثانه", type: "fun", fee: 150000, time: "ساعتين", desc: "قوارب دائرية من الخيزران بين غابات جوز الهند قرب هوي آن. السعر تقريبي.", src: "booking", date: "2026-11" },
+        { wiki: "Cù Lao Chàm", gem: true, name: "جزر تشام (كو لاو تشام)", type: "beach", fee: 70000, time: "يوم كامل", desc: "محمية بحرية من اليونسكو قرب هوي آن، فيها شعاب مرجانية وموية صافية وقرية صيادين هادئة. السعر للدخول تقريبي، والقارب منفصل.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: {
         mosques: [
@@ -253,6 +256,7 @@ const VN = {
         { wiki: "Jade Emperor Pagoda", name: "معبد الإمبراطور اليشم", type: "history", fee: 0, time: "ساعة", desc: "معبد طاوي مليان بخور وتماثيل خشبية منحوتة، من أجمل معابد المدينة.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Saigon River", name: "جولة نهر سايغون", type: "nature", fee: 300000, time: "مساء", desc: "قارب على النهر وقت الغروب مع أنوار المدينة. السعر تقريبي.", src: "booking", date: "2026-11" },
         { wiki: "Chợ Lớn", name: "الحي الصيني (تشو لون)", type: "food", fee: 0, time: "نصف يوم", desc: "أسواق جملة ومعابد صينية قديمة وسوق بينه تاي الضخم.", src: "wikivoyage", date: "2026-11" },
+        { wiki: "Cần Giờ Mangrove Forest", gem: true, name: "غابة مانجروف كان جيو", type: "nature", fee: 0, time: "يوم كامل", desc: "محمية حيوية من اليونسكو جنوب سايغون، غابات مانجروف وقرود وتماسيح، ونهايتها على البحر. ساعتين من المدينة.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: {
         mosques: [
@@ -412,6 +416,7 @@ const VN = {
         { wiki: "Phong Nha Cave", name: "كهف فونغ نها بالقارب", type: "nature", fee: 150000, time: "نصف يوم", desc: "تدخل الكهف بقارب عبر نهر تحت الأرض. القارب له رسوم إضافية تتقسم على الركاب.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Phong Nha-Kẻ Bàng National Park", name: "الكهف المظلم (Dark Cave)", type: "fun", fee: 450000, time: "نصف يوم", desc: "زبلاين وسباحة في الطين وكاياك. مغامرة ممتعة. السعر تقريبي.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Phong Nha-Kẻ Bàng National Park", name: "الحديقة النباتية وشلال جيو", type: "nature", fee: 40000, time: "ساعتين", desc: "مشي في الغابة لشلال صغير. السعر تقريبي.", src: "wikivoyage", date: "2026-11" },
+        { wiki: "Hang En", gem: true, planner: false, name: "كهف هانغ إن", type: "nature", fee: 8000000, time: "يوم كامل", desc: "ثالث أكبر كهف في العالم، تنام فيه ليلة على شاطئ داخل الكهف. رحلة مغامرة لازم تحجزها مع شركة مرخّصة قبلها بفترة. السعر تقريبي.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: { mosques: [], food: "ما فيه مطاعم حلال. اطلب أكل بحري أو نباتي.", src: "halalspy", date: "2026-11" },
       transport: ["أقرب مطار دونغ هوي (VDH)، ساعة بالسيارة. من هوي: 3 إلى 4 ساعات بالباص."],
@@ -439,6 +444,7 @@ const VN = {
         { wiki: "Tomb of Minh Mạng", name: "مقبرة الإمبراطور مينه مانغ", type: "history", fee: 150000, time: "ساعتين", desc: "أكثر المقابر الملكية تناسقًا، بين بحيرات وأشجار.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Trường Tiền Bridge", name: "جسر ترونغ تيين", type: "history", fee: 0, time: "ساعة", desc: "جسر حديدي على نهر العطور يتلون بالأنوار ليلًا.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Lăng Cô", name: "شاطئ لانغ كو", type: "beach", fee: 0, time: "نصف يوم", desc: "خليج هادئ بين الجبال والبحر، في الطريق لدا نانغ.", src: "wikivoyage", date: "2026-11" },
+        { wiki: "Tam Giang Lagoon", gem: true, name: "بحيرة تام جيانغ", type: "nature", fee: 0, time: "نصف يوم", desc: "أكبر بحيرة شاطئية في جنوب شرق آسيا، شباك صيد على أعمدة خشب وغروب يخطف القلب. نص ساعة من هوي.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: { mosques: [], food: "الخيارات قليلة. فيه مطاعم هندية تقدم أكل حلال، تأكد منها.", src: "halalspy", date: "2026-11" },
       transport: ["من دا نانغ: ساعتين ونص عبر ممر هاي فان، أو قطار من أجمل خطوط القطار في العالم."],
@@ -492,6 +498,7 @@ const VN = {
         { wiki: "Đà Lạt railway station", name: "محطة قطار دا لات", type: "history", fee: 10000, time: "ساعة", desc: "أقدم محطة في الهند الصينية بطراز آرت ديكو، فيها قطار سياحي قصير.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Bảo Đại's Palace", name: "القصر الصيفي للإمبراطور باو داي", type: "history", fee: 30000, time: "ساعة", desc: "فيلا آخر إمبراطور لفيتنام وسط الصنوبر. السعر تقريبي.", src: "wikivoyage", date: "2026-11" },
         { wiki: "Linh Phước Pagoda", name: "معبد لينه فووك", type: "history", fee: 0, time: "ساعة", desc: "معبد مزخرف بقطع الخزف والزجاج، وفيه تنين طويل من الفسيفساء.", src: "wikivoyage", date: "2026-11" },
+        { wiki: "Tuyền Lâm Lake", gem: true, name: "بحيرة توين لام", type: "nature", fee: 0, time: "نصف يوم", desc: "بحيرة هادئة بين غابات صنوبر جنوب دا لات، فيها قوارب ومسارات وأجمل ضباب الصبح.", src: "wikivoyage", date: "2026-11" },
       ],
       halal: { mosques: [], food: "الخيارات قليلة. فيه مطاعم نباتية كثيرة في دا لات، وهي خيار آمن.", src: "halalspy", date: "2026-11" },
       transport: ["مطار ليين كوونغ (DLI) نص ساعة. من سايغون: 7 ساعات باص أو ساعة طيران."],

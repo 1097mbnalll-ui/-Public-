@@ -202,6 +202,7 @@
     return `
       <button type="button" class="pcard" data-place="${p.key}">
         ${photoBox(p)}
+        ${p.gem ? `<span class="gem-badge">💎 ${T("جوهرة مخفية", "Hidden gem")}</span>` : ""}
         <span class="pcard-body">
           ${showCity ? `<span class="pcard-city">${esc(p.city.name)}</span>` : ""}
           <span class="pcard-name">${esc(p.name)}</span>
@@ -251,6 +252,7 @@
         <div class="dlg-body">
           <a class="pcard-city" href="${B()}/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
           <h2>${esc(p.name)}</h2>
+          ${p.gem ? `<p class="gem-line">💎 ${T("جوهرة مخفية: مكان رائع، وقليل من السياح يعرفونه.", "Hidden gem: a wonderful place that few tourists know about.")}</p>` : ""}
           <div class="about">
             <p class="about-desc">${esc(p.desc)}</p>
             <div class="about-wiki"><span class="about-label">${T("نبذة من ويكيبيديا", "From Wikipedia")}</span><p id="wikiSum"></p></div>
@@ -434,7 +436,7 @@
       title: c.name, left: `${c.places.length} ${T("مكان", "places")} · ${dayWord(c.days.ideal)}`, right: `${T("من", "from")} ${money(c.costs.hotel.eco)}`,
     })).join("");
 
-    const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
+    const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c && !p.gem).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
 
     const top = D.cities[0];
     app.innerHTML = posterHero({
@@ -458,6 +460,14 @@
           <div class="band-head"><div><h2 class="display">${T("الوجهات", "Destinations")}</h2><p>${T("اضغط على أي ملصق وشوف أماكنه وأسعاره.", "Tap a poster to see its places and prices.")}</p></div></div>
           <div class="posters">${cards}</div>
         </section>
+
+        ${allPlaces.some((p) => p.gem) ? `
+        <section class="band gems-band">
+          <div class="band-head">
+            <div><h2 class="display">💎 ${T("جواهر ما يعرفها السياح", "Hidden gems")}</h2><p>${T("أماكن رائعة وموثّقة، لكن أغلب الزوار يفوّتونها.", "Wonderful, well-loved places that most visitors miss.")}</p></div>
+          </div>
+          <div class="pgrid">${allPlaces.filter((p) => p.gem).map((p) => placeCard(p, { showCity: true })).join("")}</div>
+        </section>` : ""}
 
         <section class="band">
           <div class="band-head">
@@ -580,6 +590,7 @@
           <div class="chips">
             ${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="ft" value="${k}" ${f.types.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}
             <label class="chip"><input type="checkbox" id="ff" ${f.free ? "checked" : ""}><span>💸 ${T("مجانية فقط", "Free only")}</span></label>
+            <label class="chip"><input type="checkbox" id="fgem" ${f.gem ? "checked" : ""}><span>💎 ${T("جواهر مخفية", "Hidden gems")}</span></label>
           </div>
         </div>
         <p class="count-line" id="fcount"></p>
@@ -592,12 +603,14 @@
         city: document.getElementById("fc").value,
         types: [...app.querySelectorAll("input[name=ft]:checked")].map((i) => i.value),
         free: document.getElementById("ff").checked,
+        gem: document.getElementById("fgem").checked,
       };
       store.set("placeFilter", st);
       const res = allPlaces.filter((p) =>
         (!st.city || p.city.id === st.city) &&
         (!st.types.length || st.types.includes(p.type)) &&
         (!st.free || !p.fee) &&
+        (!st.gem || p.gem) &&
         (!st.q || (p.name + p.desc + p.city.name).includes(st.q)));
       document.getElementById("fcount").textContent = res.length ? `${res.length} ${T("مكان", "places")}` : T("ما لقينا أماكن بهالفلتر. جرّب تشيل بعض الخيارات.", "Nothing matches these filters. Try removing a few.");
       list.innerHTML = res.map((p) => placeCard(p, { showCity: !st.city })).join("");
@@ -673,7 +686,7 @@
     let dayNo = 0, fees = 0, food = 0, local = 0, inter = 0, hotel = 0;
     route.forEach((c, ci) => {
       const n = alloc.get(c);
-      const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i }))
+      const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i })).filter((p) => p.planner !== false)
         .sort((a, b) => (interests.includes(b.type) ? 1 : 0) - (interests.includes(a.type) ? 1 : 0));
       const slotsOf = (p) => (p.time.includes("يوم كامل") || p.time === "Full day" ? 2 : 1);
       const tr = ci > 0 ? travel(route[ci - 1], c) : null;

@@ -34,6 +34,7 @@ addEN("vietnam", {
         ["Long Bien Bridge", "A 1903 iron bridge from the firm behind the Eiffel Tower. Walk it for views of the Red River and the trains."],
         ["Dong Xuan Market", "Hanoi's biggest covered market — fabrics to spices — with street food all around."],
         ["West Lake (Ho Tay)", "Hanoi's largest lake, with a promenade, bikes and waterside cafés. Calmer than the centre."],
+        ["Duong Lam Ancient Village", "A village over 1,000 years old, built of red laterite stone with ancient gates — old Hanoi without the crowds, an hour from the city."],
       ],
     },
     halong: {
@@ -54,6 +55,7 @@ addEN("vietnam", {
         ["Cat Ba National Park", "Rainforest and a summit trail with views over the whole island. Price is approximate."],
         ["Thien Cung Cave", "A colourfully lit cave whose formations look like palaces. Included in most cruises."],
         ["Queen Cable Car & Sun World", "A cable car over the bay to a giant Ferris wheel and theme park. Price is approximate."],
+        ["Bai Tu Long Bay", "Ha Long's eastern twin: the same limestone peaks with only a handful of boats and untouched scenery. Included in cruise pricing."],
       ],
     },
     danang: {
@@ -76,6 +78,7 @@ addEN("vietnam", {
         ["My Son Sanctuary", "Jungle-wrapped ruins of Cham Hindu temples, UNESCO-listed. An hour from Hoi An."],
         ["Han Market", "Da Nang's everyday market for food, clothes and souvenirs, by the Han River."],
         ["Basket boats of Cam Thanh", "Round bamboo boats among the coconut palms near Hoi An. Price is approximate."],
+        ["Cham Islands", "A UNESCO marine reserve off Hoi An with coral reefs, clear water and a sleepy fishing village. Entry price is approximate; boat extra."],
       ],
     },
     hcmc: {
@@ -100,6 +103,7 @@ addEN("vietnam", {
         ["Jade Emperor Pagoda", "A Taoist temple full of incense and carved wooden statues — one of the city's finest."],
         ["Saigon River cruise", "A sunset boat ride as the city lights come on. Price is approximate."],
         ["Chinatown (Cho Lon)", "Wholesale markets, old Chinese temples and the vast Binh Tay Market."],
+        ["Can Gio Mangrove Forest", "A UNESCO biosphere reserve south of Saigon: mangroves, monkeys and crocodiles, ending at the sea. Two hours from the city."],
       ],
     },
     phuquoc: {
@@ -187,6 +191,7 @@ addEN("vietnam", {
         ["Phong Nha Cave by boat", "Enter the cave by boat along an underground river. The boat fee is shared among passengers."],
         ["Dark Cave", "Zipline, mud bath and kayaking — a fun adventure. Price is approximate."],
         ["Botanical Garden & Gió Waterfall", "A forest walk to a small waterfall. Price is approximate."],
+        ["Hang En Cave", "The world's third-largest cave — camp overnight on a beach inside it. An adventure you must book well ahead with a licensed operator. Price is approximate."],
       ],
     },
     hue: {
@@ -206,6 +211,7 @@ addEN("vietnam", {
         ["Tomb of Minh Mang", "The most harmonious of the royal tombs, among lakes and trees."],
         ["Truong Tien Bridge", "An iron bridge over the Perfume River that glows in changing colours at night."],
         ["Lang Co Beach", "A calm bay between mountains and sea on the way to Da Nang."],
+        ["Tam Giang Lagoon", "Southeast Asia's largest lagoon, with fishing nets on bamboo poles and heart-stopping sunsets — 30 minutes from Hue."],
       ],
     },
     nhatrang: {
@@ -243,6 +249,7 @@ addEN("vietnam", {
         ["Da Lat Railway Station", "Indochina's oldest station, in Art Deco style, with a short scenic train."],
         ["Bao Dai's Summer Palace", "The villa of Vietnam's last emperor, among the pines. Price is approximate."],
         ["Linh Phuoc Pagoda", "A temple covered in broken porcelain and glass, with a long mosaic dragon."],
+        ["Tuyen Lam Lake", "A tranquil lake among pine forests south of Da Lat, with boats, trails and the loveliest morning mist."],
       ],
     },
     muine: {
