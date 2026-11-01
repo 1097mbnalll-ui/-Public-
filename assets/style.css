@@ -827,3 +827,10 @@ footer .logo .logo-mark { width: 34px; height: 34px; }
 .lang-en .display, .lang-en .poster h4, .lang-en .big-poster h2 { font-family: "Lalezar", sans-serif; }
 .lang-en .pass-route .line::after { transform: none; }
 .ticket .f:nth-child(3) { flex: 1.35; }
+
+/* رابط تطبيق الأندرويد */
+.app-dl { display: inline-block; margin-bottom: 10px; color: #12312f; background: var(--gold); padding: 6px 14px; border-radius: 4px; font-weight: 600; text-decoration: none; }
+.app-dl:hover { background: #ffd977; }
+footer .wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.app-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; color: var(--cream); border: 1.5px dashed rgba(246,239,226,.5); padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: .92rem; }
+.app-chip:hover { border-color: var(--gold); color: var(--gold); }

@@ -340,7 +340,8 @@
       kick: T("🌏 دليلك العربي للسفر", "🌏 Travel planning that starts with your budget"),
       title: T("ميزانيتك", "Your budget,"), sub: T("توديك وين؟", "where can it take you?"),
       lead: T("اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend, and we'll pin up a poster for every country it covers — how many days, what comfort level, and what you'll have left."),
-      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, go: T("وين تكفيني؟", "Where can I go?") }),
+      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, go: T("وين تكفيني؟", "Where can I go?") }) +
+        `<a class="app-chip" href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("حمّل تطبيق الأندرويد", "Get the Android app")}</a>`,
       poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T("آسيا<br>7 دول<br>جاهزة", "Asia<br>7 countries<br>ready") },
     }) + `
       <div class="wrap">
@@ -1062,6 +1063,9 @@
     langBtn.setAttribute("aria-label", EN_ON ? "التبديل إلى العربية" : "Switch to English");
     langBtn.addEventListener("click", () => { store.set("lang", EN_ON ? "ar" : "en"); location.reload(); });
   }
+  const APK = "https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk";
+  const appDl = document.getElementById("appDl");
+  if (appDl) appDl.textContent = T("⬇ حمّل تطبيق الأندرويد (APK)", "⬇ Get the Android app (APK)");
   const foot = document.getElementById("footText");
   if (foot) foot.textContent = T("الأسعار تقريبية ومأخوذة من المصادر المذكورة جنب كل رقم، وتتغير مع الوقت. تأكد منها قبل الحجز.", "Prices are estimates drawn from the sources shown next to each figure, and they change over time. Always check before you book.");
   document.title = T("رحّال: دليل السفر بالميزانية", "Wayfarer — travel planning that starts with your budget");
