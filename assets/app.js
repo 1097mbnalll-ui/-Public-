@@ -631,7 +631,7 @@
             <div><dt>${T("السكن لليلة", "Hotels per night")}</dt><dd>${T(`من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}`, `${money(c.costs.hotel.eco)} – ${money(c.costs.hotel.lux)}`)}</dd></div>
             <div><dt>${T("أقرب مطار", "Nearest airport")}</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} ${T("بالطريق", "by road")})`}</dd></div>
           </dl>
-          <div class="facts-book">🛏️ ${T("أسعار السكن الحقيقية الحين:", "Live lodging prices:")} ${bookingLinks(c, getPlan().travelers)}</div>
+          <div class="facts-book">🛏️ ${T("أسعار السكن الحقيقية الحين:", "Live lodging prices:")} ${(() => { const gp = getPlan(); return bookingLinks(c, gp.travelers, gp.startDate, gp.endDate) + (gp.startDate && gp.endDate ? `<small>${T("بتواريخ رحلتك", "for your dates")}: ${niceDate(gp.startDate)} – ${niceDate(gp.endDate)}</small>` : ""); })()}</div>
           <a class="btn no-print" href="${B()}/plan">${T("كم تكفيني ميزانيتي؟", "What will my budget cover?")}</a>
         </aside>
       </div>`;
@@ -766,11 +766,19 @@
     store.set("passport", e.target.value);
     const y = window.scrollY; render(); window.scrollTo({ top: y, behavior: "instant" });
   });
-  function bookingLinks(c, travelers) {
+  // التواريخ بصيغة YYYY-MM-DD
+  const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parseDate = (v) => { if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null; const [y, m, d] = v.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (v, n) => { const d = parseDate(v); d.setDate(d.getDate() + n); return isoDate(d); };
+  const niceDate = (v) => parseDate(v).toLocaleDateString(EN_ON ? "en-GB" : "ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short" });
+  const tripDays = (a, b) => { const x = parseDate(a), y = parseDate(b); return x && y && y >= x ? Math.round((y - x) / 864e5) + 1 : 0; };
+
+  function bookingLinks(c, travelers, checkin, checkout) {
     const ce = (window.EN_DATA && window.EN_DATA.asia && window.EN_DATA.asia[D.id]) || "";
     const q = cityWiki(c) + (ce ? ", " + ce : "");
-    const b = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}&group_adults=${travelers}&no_rooms=${Math.ceil(travelers / 2)}`;
-    const a = `https://www.airbnb.com/s/${encodeURIComponent(q)}/homes?adults=${travelers}`;
+    const dates = checkin && checkout && checkout > checkin;
+    const b = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}&group_adults=${travelers}&no_rooms=${Math.ceil(travelers / 2)}${dates ? `&checkin=${checkin}&checkout=${checkout}` : ""}`;
+    const a = `https://www.airbnb.com/s/${encodeURIComponent(q)}/homes?adults=${travelers}${dates ? `&checkin=${checkin}&checkout=${checkout}` : ""}`;
     return `<span class="book-links"><a href="${b}" target="_blank" rel="noopener">Booking ↗</a><a href="${a}" target="_blank" rel="noopener">Airbnb ↗</a></span>`;
   }
 
@@ -833,7 +841,7 @@
   const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.flightSAR * D.currency.perSAR * travelers : 0);
 
   function candidates(days, interests) {
-    const k = Math.max(1, Math.min(6, Math.round(days / 3)));
+    const k = Math.max(1, Math.min(6, D.cities.length, Math.round(days / 3)));
     const seen = new Set(), out = [];
     const add = (set) => {
       const r = [...set].sort((a, b) => b.lat - a.lat);
@@ -926,6 +934,15 @@
               <div class="chips" style="margin-top:10px">${presetsFor(currency).map((v) => `<button type="button" class="chip-btn" data-b="${v}">${fmt(v)}</button>`).join("")}</div>
             </div>
             <div class="field">
+              <span class="label">${T("موعد السفر", "Travel dates")} <small class="hint" style="margin:0">${T("اختياري", "optional")}</small></span>
+              <div class="date-row">
+                <label><small>${T("من", "From")}</small><input type="date" id="dStart" value="${s.startDate || ""}" min="${isoDate(new Date())}"></label>
+                <label><small>${T("إلى", "To")}</small><input type="date" id="dEnd" value="${s.endDate || ""}" min="${s.startDate || isoDate(new Date())}"></label>
+                <button type="button" class="date-clear" id="dClear" aria-label="${T("مسح التاريخ", "Clear dates")}">✕</button>
+              </div>
+              <small class="hint" id="dHint"></small>
+            </div>
+            <div class="field">
               <label for="days">${T("مدة الرحلة", "Trip length")} <output id="daysOut"></output></label>
               <input type="range" id="days" min="3" max="21" value="${s.days}">
             </div>
@@ -962,11 +979,30 @@
     const resEl = document.getElementById("result");
     const budgetIn = document.getElementById("budget");
     let timer;
+    const dStart = document.getElementById("dStart"), dEnd = document.getElementById("dEnd"), dHint = document.getElementById("dHint");
+    const syncDates = () => {
+      dEnd.min = dStart.value || isoDate(new Date());
+      if (dStart.value && !dEnd.value) dEnd.value = addDays(dStart.value, +form.days.value - 1);
+      const n = tripDays(dStart.value, dEnd.value);
+      if (n) {
+        form.days.value = Math.max(3, Math.min(21, n));
+        form.days.disabled = true;
+        dHint.textContent = n < 3 || n > 21 ? T("المخطط يدعم من 3 إلى 21 يوم، فعدّلنا المدة.", "Plans cover 3–21 days, so we adjusted the length.") : T(`${dayWord(n)} و${n - 1} ليالي`, `${dayWord(n)}, ${n - 1} nights`);
+      } else {
+        form.days.disabled = false;
+        dHint.textContent = dStart.value && dEnd.value ? T("تاريخ الرجوع لازم يكون بعد تاريخ السفر.", "Return date must be after the start date.") : "";
+      }
+    };
+    [dStart, dEnd].forEach((el) => el.addEventListener("change", () => { syncDates(); update(true); }));
+    document.getElementById("dClear").addEventListener("click", () => { dStart.value = ""; dEnd.value = ""; syncDates(); update(true); });
+    syncDates();
     const read = () => {
       const travelers = +form.travelers.value;
       const budgetMode = form.querySelector("input[name=bmode]:checked").value;
       return {
       budgetMode,
+      startDate: tripDays(dStart.value, dEnd.value) ? dStart.value : "",
+      endDate: tripDays(dStart.value, dEnd.value) ? dEnd.value : "",
       budget: (parseFloat(budgetIn.value.replace(/[^\d.]/g, "")) || 0) * rate() * (budgetMode === "pp" ? travelers : 1),
       days: +form.days.value,
       travelers,
@@ -1085,12 +1121,16 @@
           <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${T(`${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}`, `${dayWord(sec.days.length)} · day ${sec.days[0].day}${sec.days.length > 1 ? "–" + sec.days[sec.days.length - 1].day : ""}`)}</span></div>
           <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>${T("عن الوجهة", "About")}</a>
         </header>
-        <div class="leg-book">🛏️ ${T("شوف أسعار السكن الحقيقية:", "Check live prices:")} ${bookingLinks(sec.city, s.travelers)}</div>
+        ${(() => {
+          const a = sec.days[0].day, z = sec.days[sec.days.length - 1].day;
+          const ci = s.startDate ? addDays(s.startDate, a - 1) : "", co = s.startDate ? addDays(s.startDate, Math.min(z, s.days - 1)) : "";
+          return `<div class="leg-book">🛏️ ${s.startDate ? `${T("سكنك هنا", "Your stay")}: <b>${niceDate(ci)} – ${niceDate(co)}</b> ·` : T("شوف أسعار السكن الحقيقية:", "Check live prices:")} ${bookingLinks(sec.city, s.travelers, ci, co)}</div>`;
+        })()}
         <header style="display:none">
         </header>
         ${sec.days.map((d) => `
           <div class="pday">
-            <div class="pday-n"><small>${T("اليوم", "Day")}</small>${d.day}</div>
+            <div class="pday-n"><small>${s.startDate ? niceDate(addDays(s.startDate, d.day - 1)) : T("اليوم", "Day")}</small>${d.day}</div>
             <div class="pday-items">${d.items.map((it) => it.p
               ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>★ ${it.p.rating.toFixed(1)} · ${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
               : `<div class="prow note-row"><span class="note-ico">${noteIco(it)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
@@ -1109,7 +1149,7 @@
               <div class="code">${esc(last.code || last.en)}<small>${esc(last.name)}</small></div>
             </div>
             <div class="pass-fields">
-              <div>${T("المدة", "Length")}<b>${dayWord(s.days)}</b></div>
+              <div>${T("المدة", "Length")}<b>${dayWord(s.days)}</b>${s.startDate ? `<small class="pass-dates">${niceDate(s.startDate)} – ${niceDate(s.endDate)}</small>` : ""}</div>
               <div>${T("المسافرون", "Travellers")}<b>${paxWord(s.travelers)}</b></div>
               <div>${T("المستوى", "Comfort")}<b>${tiersLabel(r.tiers, true)}</b></div>
               <div>${T("المحطات", "Stops")}<b>${EN_ON ? r.route.length + (r.route.length === 1 ? " stop" : " stops") : r.route.length === 1 ? "وجهة وحدة" : r.route.length === 2 ? "وجهتين" : r.route.length + " وجهات"}</b></div>

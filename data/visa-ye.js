@@ -30,3 +30,34 @@ window.VISA_YE = {
     res: ["قدّم عن طريق سفارة أذربيجان في الرياض. بعض المصادر تطلب إقامة سارية 6 شهور.", "Apply through the Azerbaijani embassy in Riyadh. Some sources ask for at least 6 months left on the iqama."],
   },
 };
+
+Object.assign(window.VISA_YE, {
+  kyrgyzstan: {
+    ye: ["تأشيرة إلكترونية (eVisa) من البوابة الرسمية لقيرغيزستان قبل السفر.", "An e-visa from Kyrgyzstan's official portal before travel."],
+    res: ["نفس التأشيرة الإلكترونية، وارفع الإقامة السعودية مع الطلب لو طُلبت.", "Same e-visa; upload your Saudi iqama if requested."],
+  },
+  uzbekistan: {
+    ye: ["تحتاج تأشيرة. جرّب التأشيرة الإلكترونية من e-visa.gov.uz، ولو ما كانت متاحة لجوازك فعن طريق السفارة.", "A visa is required. Try the e-visa at e-visa.gov.uz; if it isn't open to your passport, apply via the embassy."],
+    res: ["قدّم عن طريق سفارة أوزبكستان في الرياض مع الإقامة السارية.", "Apply through the Uzbek embassy in Riyadh with your valid iqama."],
+  },
+  kazakhstan: {
+    ye: ["تحتاج تأشيرة مسبقة. فيه تأشيرة إلكترونية لبعض الجنسيات، تأكد إذا الجواز اليمني منها.", "A visa is required in advance. Kazakhstan has an e-visa for some nationalities — check whether Yemen qualifies."],
+    res: ["قدّم عن طريق سفارة كازاخستان في الرياض مع الإقامة.", "Apply via the Kazakh embassy in Riyadh with your iqama."],
+  },
+  srilanka: {
+    ye: ["تصريح إلكتروني ETA من البوابة الرسمية قبل السفر، أو تأشيرة عند الوصول.", "An online ETA from the official portal before travel, or a visa on arrival."],
+    res: ["نفس التصريح الإلكتروني.", "The same online ETA."],
+  },
+  singapore: {
+    ye: ["تحتاج تأشيرة، ولازم تقدم عن طريق جهة محلية في سنغافورة (فندق أو وكيل سفر معتمد).", "A visa is required, applied for through a local Singapore contact (a hotel or approved travel agent)."],
+    res: ["نفس الشرط، والإقامة السعودية تدعم الطلب لكن ما تعفيك.", "Same rule — a Saudi iqama supports the application but doesn't exempt you."],
+  },
+  southkorea: {
+    ye: ["تحتاج تأشيرة من السفارة الكورية، مع كشف حساب وحجوزات.", "A visa from the Korean embassy, with bank statements and bookings."],
+    res: ["قدّم في السفارة الكورية في الرياض مع الإقامة.", "Apply at the Korean embassy in Riyadh with your iqama."],
+  },
+  japan: {
+    ye: ["تحتاج تأشيرة من السفارة اليابانية، مع برنامج الرحلة والحجوزات.", "A visa from the Japanese embassy, with your itinerary and bookings."],
+    res: ["قدّم في السفارة اليابانية في الرياض أو القنصلية في جدة مع الإقامة.", "Apply at the Japanese embassy in Riyadh or consulate in Jeddah with your iqama."],
+  },
+});

@@ -901,3 +901,15 @@ footer .wrap { display: flex; flex-direction: column; align-items: flex-start; g
 .visa-card { border: 2px solid #e4572e; }
 .visa-card p { margin: 6px 0 0; }
 .visa-mini { font-size: .72rem; color: #5d6f6c; margin: 6px 0 0; line-height: 1.5; }
+
+/* موعد السفر */
+.date-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.date-row label { display: flex; flex-direction: column; gap: 2px; font-weight: 400 !important; margin: 0 !important; }
+.date-row small { font-size: .74rem; color: #5d6f6c; }
+.date-row input { font: 500 .9rem "Readex Pro", sans-serif; color: #12312f; background: #fff; border: 1px solid #d9cdb3; border-radius: 8px; padding: 7px 8px; width: 100%; min-width: 0; }
+.date-clear { border: 0; background: #ece1cc; color: #12312f; border-radius: 8px; width: 34px; height: 36px; cursor: pointer; }
+#dHint { display: block; margin-top: 6px; color: #1d7a5f; font-weight: 500; }
+input[type="range"]:disabled { opacity: .45; }
+.pass-dates { display: block; font-size: .72rem; color: var(--coral); }
+.facts-book small { color: #1d7a5f; }
+.pday-n small { font-size: .62rem; }
