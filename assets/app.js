@@ -512,6 +512,7 @@
             <div>${T("الوجهات", "Destinations")}<b>${T(`${D.cities.length} وجهة · ${allPlaces.length} مكان`, `${D.cities.length} destinations · ${allPlaces.length} places`)}</b></div>
           </div>
         </div>
+        ${window.MAPS && window.MAPS[D.id] ? `<a class="map-cta" href="${B()}/map">🗺️ ${T("افتح خريطة الأسعار التفاعلية", "Open the interactive price map")}</a>` : ""}
         ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate() / (plan.budgetMode === "pp" ? plan.travelers : 1)), unit: curName(), days: plan.days, travelers: plan.travelers, mode: plan.budgetMode, go: T("وريني الخيارات", "Show my options") })}`,
       poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: T(`${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, `${top.places.length} places · ${dayWord(top.days.ideal)} suggested`), stamp: T(`${D.cities.length}<br>وجهات`, `${D.cities.length}<br>stops`) },
     }) + `
@@ -1179,6 +1180,280 @@
     loadPhotos(dlg);
   }
 
+  // ---------- الخريطة التفاعلية ----------
+  const smoothPath = (pts, close = true) => {
+    const p = close ? [pts[pts.length - 1], ...pts, pts[0], pts[1]] : [pts[0], ...pts, pts[pts.length - 1]];
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 1; i < p.length - 2; i++) {
+      const [a, b, c, e] = [p[i - 1], p[i], p[i + 1], p[i + 2]];
+      d += ` C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)},${(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)},${(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)},${c[1].toFixed(1)}`;
+    }
+    return d + (close ? "Z" : "");
+  };
+  const heatCol = (t) => {
+    const st = [[0, [58, 165, 122]], [0.3, [166, 211, 111]], [0.55, [255, 212, 90]], [0.78, [255, 155, 69]], [1, [226, 70, 58]]];
+    t = Math.max(0, Math.min(1, t));
+    for (let i = 1; i < st.length; i++) if (t <= st[i][0]) { const a = st[i - 1], b = st[i], k = (t - a[0]) / (b[0] - a[0]); return `rgb(${a[1].map((v, j) => Math.round(v + (b[1][j] - v) * k))})`; }
+    return "rgb(226,70,58)";
+  };
+  // أشهر الذروة حسب المنطقة (تقديري): الشمال أكتوبر–أبريل، الوسط فبراير–أغسطس، الجنوب ديسمبر–أبريل
+  const seasonCurve = (c) => {
+    const peak = c.lat > 19 ? [0, 1, 2, 3, 9, 10, 11] : c.lat > 12 ? [1, 2, 3, 4, 5, 6, 7] : [0, 1, 2, 3, 11];
+    return [...Array(12)].map((_, m) => (peak.includes(m) ? 1.12 : 0.88) + (((m * 7) % 5) - 2) / 100);
+  };
+  const MONTHS = EN_ON ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] : ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  function sparkSVG(vals) {
+    const mx = Math.max(...vals), mn = Math.min(...vals), r = mx - mn || 1;
+    const pts = vals.map((v, i) => [i * (300 / (vals.length - 1)), 42 - ((v - mn) / r) * 34]);
+    const d = smoothPath(pts, false);
+    return `<svg viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e4572e" stop-opacity=".35"/><stop offset="1" stop-color="#e4572e" stop-opacity="0"/></linearGradient></defs><path d="${d} L300,46 L0,46Z" fill="url(#spg)"/><path d="${d}" fill="none" stroke="#e4572e" stroke-width="2.5"/></svg>`;
+  }
+
+  function viewMap(cityId) {
+    const M = window.MAPS && window.MAPS[D.id];
+    if (!M) return viewNotFound();
+    const CM = cityId && M.cities[cityId];
+    if (cityId && !CM) return viewNotFound();
+    const st = { layer: "hotel", tier: "mid", stay: "hotel", ...store.get("mapState", {}) };
+    const save = () => store.set("mapState", st);
+    const city = CM ? cityById[cityId] : null;
+    const L = (pair) => pair[EN_ON ? 1 : 0];
+    const LAYERS = [["hotel", T("🏨 السكن", "🏨 Stay")], ["food", T("🍽️ الأكل", "🍽️ Food")], ["transport", T("🚕 التنقل", "🚕 Transport")], ["total", T("💰 الإجمالي", "💰 Total")]];
+    const value = (c, f = 1) => {
+      const k = c.costs, t = st.tier;
+      if (st.layer === "hotel") return k.hotel[t] * f * (st.stay === "apt" ? STAY.apt[t] / 2 : 1);
+      if (st.layer === "food") return k.food[t] * Math.sqrt(f);
+      if (st.layer === "transport") return k.transport[t];
+      return (k.hotel[t] * f) / 2 + k.food[t] * Math.sqrt(f) + k.transport[t];
+    };
+    const unitLabel = () => (st.layer === "hotel" ? T("لليلة", "per night") : T("للشخص باليوم", "pp / day"));
+
+    // النقاط: مدن الدولة أو أحياء العاصمة
+    let items, outline = null, bounds;
+    if (!CM) {
+      outline = M.outline;
+      items = D.cities.map((c) => { const [x, y] = M.project(c.lat, c.lon); return { id: c.id, c, x, y, name: c.short || c.name, v: value(c), main: c.id === M.capital }; });
+      bounds = [-30, -15, 240, 405];
+    } else {
+      items = CM.districts.map((d) => ({ id: d.id, d, x: d.x, y: d.y, name: L(d.name), v: value(city, d.f), main: !!d.main }));
+      bounds = [-460, -330, 920, 700];
+    }
+    const vs = items.map((i) => i.v), vmin = Math.min(...vs), vmax = Math.max(...vs);
+    const norm = (v) => (vmax === vmin ? 0.5 : (v - vmin) / (vmax - vmin));
+    let sel = store.get("mapSel:" + (cityId || D.id), null);
+    if (!items.find((i) => i.id === sel)) sel = (items.find((i) => i.main) || items[0]).id;
+
+    const chips = `
+      <div class="mv-chips">
+        ${LAYERS.map(([k, l]) => `<button type="button" class="mv-chip glass ${st.layer === k ? "on" : ""}" data-layer="${k}">${l}</button>`).join("")}
+        <span class="mv-sep"></span>
+        ${TIERS.map((t) => `<button type="button" class="mv-chip glass ${st.tier === t ? "on" : ""}" data-tier="${t}">${D.tiers[t].name}</button>`).join("")}
+        ${CM ? `<button type="button" class="mv-chip glass ${st.stay === "apt" ? "on" : ""}" data-stay>🏠 ${st.stay === "apt" ? "Airbnb" : T("فندق", "Hotel")} ⇄</button>` : ""}
+      </div>`;
+    app.innerHTML = `
+      <div class="mapview ${CM ? "is-city" : ""}" id="mv">
+        <svg id="msvg" class="mv-svg" role="img" aria-label="${T("خريطة الأسعار", "Price map")}">
+          <defs>
+            <radialGradient id="mvSea" cx="70%" cy="35%" r="90%"><stop offset="0" stop-color="#d5ebe8"/><stop offset="1" stop-color="#a9d1d0"/></radialGradient>
+            <filter id="mvBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${CM ? 55 : 14}"/></filter>
+            <filter id="mvShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0f3d3e" flood-opacity=".25"/></filter>
+            <pattern id="mvTopo" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M0,5 Q2.5,2 5,5 T10,5" fill="none" stroke="#e3d6bb" stroke-width=".6"/></pattern>
+            ${outline ? `<clipPath id="mvClip"><path d="${smoothPath(outline)}"/></clipPath>` : ""}
+          </defs>
+          <rect x="-2000" y="-2000" width="5000" height="5000" fill="${CM ? "#efe7d6" : "url(#mvSea)"}"/>
+          <g id="mvBase"></g><g id="mvHeat" filter="url(#mvBlur)" opacity=".78"></g><g id="mvOver"></g><g id="mvPins"></g>
+        </svg>
+        <div class="mv-top">
+          <div class="mv-crumb glass">${CM ? `<a href="${B()}/map">${D.flag} ${esc(D.name)}</a> ‹ <b>${esc(city.short || city.name)}</b> · ${T("الأحياء", "Neighbourhoods")}` : `${D.flag} <b>${esc(D.name)}</b> · ${T("خريطة الأسعار", "Price map")}`}</div>
+        </div>
+        ${chips}
+        <div class="mv-ctl glass"><button type="button" data-z="in" aria-label="${T("تكبير", "Zoom in")}">＋</button><button type="button" data-z="out" aria-label="${T("تصغير", "Zoom out")}">－</button><button type="button" data-z="reset" aria-label="${T("رجوع", "Reset")}">◎</button></div>
+        <div class="mv-legend glass"><b>${st.layer === "hotel" ? T("سعر الليلة", "Price per night") : st.layer === "food" ? T("الأكل للشخص باليوم", "Food per person per day") : st.layer === "transport" ? T("التنقل للشخص باليوم", "Transport per person per day") : T("الإجمالي للشخص باليوم", "Total per person per day")}</b><div class="mv-bar"></div><div class="mv-ends"><span>${T("أرخص", "Cheaper")} · ${money(vmin)}</span><span>${T("أغلى", "Pricier")} · ${money(vmax)}</span></div><small>${T("أسعار تقديرية", "Estimated prices")}${CM ? T(" · مواقع الأحياء تقريبية", " · approximate neighbourhood layout") : ""}</small></div>
+        <aside class="mv-sheet" id="mvSheet"></aside>
+      </div>`;
+
+    const svg = document.getElementById("msvg");
+    const base = document.getElementById("mvBase"), heat = document.getElementById("mvHeat"), over = document.getElementById("mvOver"), pinsG = document.getElementById("mvPins");
+    // الخلفية
+    if (!CM) {
+      const land = smoothPath(outline);
+      base.innerHTML = `${[...Array(8)].map((_, i) => `<path d="M-80,${i * 55 - 10} C40,${i * 55 - 25} 160,${i * 55 + 15} 320,${i * 55 - 5}" stroke="#fff" stroke-opacity=".2" fill="none" stroke-width=".8"/>`).join("")}
+        <path d="${land}" fill="#f4ecdc" filter="url(#mvShadow)"/><path d="${land}" fill="url(#mvTopo)" opacity=".7"/>`;
+      heat.setAttribute("clip-path", "url(#mvClip)");
+      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${i.main ? 34 : 26}" fill="${heatCol(norm(i.v))}"/>`).join("");
+      over.innerHTML = `<path d="${land}" fill="none" stroke="#fff" stroke-width="2"/><path d="${land}" fill="none" stroke="#12312f" stroke-opacity=".25" stroke-width=".7"/>`;
+    } else {
+      let streets = "";
+      for (let i = -9; i <= 9; i++) {
+        streets += `<path d="${smoothPath([[-520, i * 55 - 30], [-200, i * 55 + 10], [60, i * 55 - 15], [520, i * 55 + 20]], false)}" stroke="#fff" stroke-width="${i % 3 ? 1.4 : 3.5}" fill="none" opacity=".85"/>`;
+        streets += `<path d="${smoothPath([[i * 60 - 20, -420], [i * 60 + 15, -120], [i * 60 - 10, 140], [i * 60 + 20, 420]], false)}" stroke="#fff" stroke-width="${i % 3 ? 1.4 : 3.5}" fill="none" opacity=".85"/>`;
+      }
+      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${i.main ? 125 : 110}" fill="${heatCol(norm(i.v))}"/>`).join("");
+      const w = CM.walk;
+      over.innerHTML = `${streets}
+        <path d="${smoothPath(CM.lake)}" fill="#a9d1d0"/><path d="${smoothPath(CM.pond)}" fill="#a9d1d0"/>
+        <path d="${smoothPath(CM.river, false)}" stroke="#a9d1d0" stroke-width="70" fill="none" stroke-linecap="round"/>
+        <path d="M120,-60 L250,-50" stroke="#c8323a" stroke-width="5"/>
+        <circle cx="${w.x}" cy="${w.y}" r="${w.r}" fill="rgba(15,61,62,.05)" stroke="#0f3d3e" stroke-width="1.5" stroke-dasharray="4 6" vector-effect="non-scaling-stroke"/>
+        <text x="${w.x + w.r * 0.75}" y="${w.y + w.r + 18}" text-anchor="middle" font-size="13" font-weight="600" fill="#0f3d3e">🚶 ${T("15 دقيقة مشي", "15-min walk")}</text>
+        <text x="-165" y="-215" text-anchor="middle" font-size="13" fill="#3f7f86" font-style="italic">${L(CM.lakeName)}</text>
+        <text x="190" y="260" text-anchor="middle" font-size="13" fill="#3f7f86" font-style="italic" transform="rotate(-62 190 260)">${L(CM.riverName)}</text>
+        ${CM.landmarks.map(([e, x, y]) => `<g><circle cx="${x}" cy="${y}" r="17" fill="#fff" stroke="#0f3d3e" stroke-width="1.5"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="17">${e}</text></g>`).join("")}`;
+    }
+    pinsG.innerHTML = items.map((i) => `
+      <g class="mv-pin ${i.id === sel ? "sel" : ""}" data-id="${i.id}" data-x="${i.x}" data-y="${i.y}" tabindex="0" role="button" aria-label="${esc(i.name)} ${money(i.v)}">
+        <circle class="pdot" r="7" fill="${heatCol(norm(i.v))}" stroke="#fff" stroke-width="2.5"/>
+        <g class="mv-pin-in">
+          <rect class="pb" x="-44" y="-38" width="88" height="26" rx="13"/>
+          <circle cx="-30" cy="-25" r="4.5" fill="${heatCol(norm(i.v))}"/>
+          <text class="pv" x="6" y="-20" text-anchor="middle">${money(i.v)}</text>
+          <path class="pt" d="M-6,-12.5 L0,-5 L6,-12.5Z"/>
+          <text class="pn" y="10" text-anchor="middle">${esc(i.name)}</text>
+        </g>
+      </g>`).join("");
+    // عرض النص بعرض السعر
+    pinsG.querySelectorAll(".mv-pin").forEach((g) => {
+      const t = g.querySelector(".pv"); const w = Math.max(70, t.getComputedTextLength() + 34);
+      const r = g.querySelector(".pb"); r.setAttribute("x", -w / 2); r.setAttribute("width", w);
+      g.querySelector(".mv-pin-in circle").setAttribute("cx", -w / 2 + 12); t.setAttribute("x", 7);
+    });
+
+    // التكبير والتحريك
+    const home = { x: bounds[0], y: bounds[1], w: bounds[2], h: bounds[3] };
+    let v = { ...home };
+    const fit = () => {
+      const r = svg.getBoundingClientRect();
+      const sheetW = window.innerWidth > 860 ? 420 : 0;
+      const usable = Math.max(200, r.width - sheetW);
+      const topR = window.innerWidth > 860 ? 130 : 135, botR = window.innerWidth > 860 ? 30 : r.height * 0.4 + 60;
+      const usableH = Math.max(200, r.height - topR - botR);
+      const aspect = usableH / usable;
+      let w = home.w, h = home.h;
+      if (h / w > aspect) w = h / aspect; else h = w * aspect;
+      // نوسع العرض عشان البطاقة ما تغطي الخريطة
+      const extra = (w * sheetW) / usable;
+      const pxH = h / usableH;
+      v = { x: home.x - (w - home.w) / 2 - (EN_ON ? 0 : extra), y: home.y - (h - home.h) / 2 - topR * pxH, w: w + extra, h: h + (topR + botR) * pxH };
+    };
+    const apply = () => {
+      svg.setAttribute("viewBox", `${v.x} ${v.y} ${v.w} ${v.h}`);
+      const k = v.w / svg.getBoundingClientRect().width;
+      pinsG.querySelectorAll(".mv-pin").forEach((g) => g.setAttribute("transform", `translate(${g.dataset.x} ${g.dataset.y}) scale(${k})`));
+      declutter(k);
+    };
+    // الدبابيس المتزاحمة تتحول لنقطة صغيرة، والأولوية للمختار والعاصمة والأكثر أماكن
+    const prio = (i) => (i.id === sel ? 1e6 : 0) + (i.main ? 1e5 : 0) + (i.c ? i.c.places.length : -Math.abs(i.d.walk));
+    const declutter = (k) => {
+      const placed = [];
+      [...items].sort((a, b) => prio(b) - prio(a)).forEach((i) => {
+        const g = pinsG.querySelector(`.mv-pin[data-id="${i.id}"]`);
+        const w = (+g.querySelector(".pb").getAttribute("width") + 8) * k, box = [i.x - w / 2, i.y - 40 * k, i.x + w / 2, i.y + 18 * k];
+        const hit = placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1]);
+        g.classList.toggle("mini", hit);
+        if (!hit) placed.push(box);
+      });
+      pinsG.querySelectorAll(".mv-pin:not(.mini)").forEach((g) => pinsG.appendChild(g));
+    };
+    const zoom = (f, cx, cy) => {
+      const nw = Math.max(home.w * 0.15, Math.min(home.w * 3, v.w * f));
+      const k = nw / v.w;
+      cx = cx ?? v.x + v.w / 2; cy = cy ?? v.y + v.h / 2;
+      v = { x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k, w: v.w * k, h: v.h * k };
+      apply();
+    };
+    const toWorld = (ev) => { const r = svg.getBoundingClientRect(); return [v.x + ((ev.clientX - r.left) / r.width) * v.w, v.y + ((ev.clientY - r.top) / r.height) * v.h]; };
+    svg.addEventListener("wheel", (e) => { e.preventDefault(); const [x, y] = toWorld(e); zoom(e.deltaY > 0 ? 1.15 : 1 / 1.15, x, y); }, { passive: false });
+    let drag = null, moved = false;
+    const pointers = new Map();
+    svg.addEventListener("pointerdown", (e) => { pointers.set(e.pointerId, e); drag = { x: e.clientX, y: e.clientY, v: { ...v } }; moved = false; });
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (pointers.size === 2) {
+        const prev = pointers.get(e.pointerId); pointers.set(e.pointerId, e);
+        const [a, b] = [...pointers.values()];
+        const d1 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        const o = a === e ? b : a; const d0 = Math.hypot(prev.clientX - o.clientX, prev.clientY - o.clientY);
+        if (d0 && d1) zoom(d0 / d1); moved = true; return;
+      }
+      const r = svg.getBoundingClientRect();
+      const dx = ((e.clientX - drag.x) / r.width) * drag.v.w, dy = ((e.clientY - drag.y) / r.height) * drag.v.h;
+      if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 4) moved = true;
+      if (moved && !svg.hasPointerCapture(e.pointerId)) svg.setPointerCapture(e.pointerId);
+      v = { ...v, x: drag.v.x - dx, y: drag.v.y - dy }; apply();
+    });
+    const end = (e) => { pointers.delete(e.pointerId); if (!pointers.size) drag = null; };
+    svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+    document.querySelector(".mv-ctl").addEventListener("click", (e) => {
+      const z = e.target.closest("[data-z]"); if (!z) return;
+      if (z.dataset.z === "in") zoom(1 / 1.35); else if (z.dataset.z === "out") zoom(1.35); else { fit(); apply(); }
+    });
+
+    // البطاقة
+    const sheet = document.getElementById("mvSheet");
+    const avg = vs.reduce((a, b) => a + b, 0) / vs.length;
+    const paint = () => {
+      const it = items.find((i) => i.id === sel);
+      pinsG.querySelectorAll(".mv-pin").forEach((g) => g.classList.toggle("sel", g.dataset.id === sel));
+      declutter(v.w / svg.getBoundingClientRect().width);
+      const diff = Math.round(((it.v - avg) / avg) * 100);
+      const diffTxt = diff < -3 ? T(`<b>أرخص ${-diff}%</b> من المتوسط`, `<b>${-diff}% cheaper</b> than average`) : diff > 3 ? T(`<b>أغلى ${diff}%</b> من المتوسط`, `<b>${diff}% pricier</b> than average`) : T("<b>قريب من المتوسط</b>", "<b>About average</b>");
+      if (!CM) {
+        const c = it.c;
+        const canZoom = !!M.cities[c.id];
+        const curve = seasonCurve(c).map((x) => value(c) * x);
+        const cheapM = MONTHS[curve.indexOf(Math.min(...curve))];
+        sheet.innerHTML = `
+          <div class="mv-grab"></div>
+          <div class="mv-art">${cityScene(c, true)}${photoOver(cityWiki(c))}${c.id === M.capital ? `<span class="mv-badge">📍 ${T("العاصمة", "Capital")}</span>` : ""}</div>
+          <div class="mv-body">
+            <div><h2>${esc(c.name)}</h2><div class="mv-sub">${esc(c.region)} · ${c.places.length} ${T("مكان", "places")} · ${dayWord(c.days.ideal)}</div></div>
+            <div class="mv-kpis"><div><small>🏨 ${T("الليلة", "Night")}</small><b>${money(c.costs.hotel[st.tier])}</b></div><div><small>🍽️ ${T("اليوم", "Day")}</small><b>${money(c.costs.food[st.tier])}</b></div><div><small>🚕 ${T("اليوم", "Day")}</small><b>${money(c.costs.transport[st.tier])}</b></div></div>
+            <div class="mv-spark"><small>${T(`السعر خلال السنة (تقديري) · الأرخص في ${cheapM}`, `Price through the year (est.) · cheapest in ${cheapM}`)}</small>${sparkSVG(curve)}</div>
+            <div class="mv-tip">💡 ${diffTxt} ${T("في", "in")} ${esc(D.name)}.</div>
+            <div class="mv-cta">${canZoom ? `<a class="p" href="${B()}/map/${c.id}">🔍 ${T("قرّب على", "Zoom into")} ${esc(c.short || c.name)}</a>` : `<a class="p" href="${B()}/city/${c.id}">${T("صفحة الوجهة", "Destination page")}</a>`}<a class="s" href="${B()}/plan">${T("خطط رحلة", "Plan a trip")}</a></div>
+          </div>`;
+      } else {
+        const d = it.d;
+        const nearCheaper = items.filter((x) => x.id !== d.id && x.d.walk <= 15 && x.v < it.v).sort((a, b) => a.v - b.v)[0];
+        const tip = nearCheaper ? T(`<b>وفّر ${Math.round((1 - nearCheaper.v / it.v) * 100)}%:</b> اسكن في ${esc(nearCheaper.name)} (${money(nearCheaper.v)}) وتوصل الحي القديم في ${nearCheaper.d.walk} دقيقة.`, `<b>Save ${Math.round((1 - nearCheaper.v / it.v) * 100)}%:</b> stay in ${esc(nearCheaper.name)} (${money(nearCheaper.v)}) and reach the Old Quarter in ${nearCheaper.d.walk} min.`) : diffTxt + T(" في المدينة.", " in the city.");
+        const byWalk = [...items].sort((a, b) => a.d.walk - b.d.walk).map((x) => x.v);
+        const q = `${d.name[1]}, ${cityWiki(city)}, ${(window.EN_DATA && window.EN_DATA.asia[D.id]) || ""}`;
+        const gp = getPlan();
+        const dates = gp.startDate && gp.endDate ? `&checkin=${gp.startDate}&checkout=${gp.endDate}` : "";
+        sheet.innerHTML = `
+          <div class="mv-grab"></div>
+          <div class="mv-art">${cityScene(city, true)}${d.main ? `<span class="mv-badge">⭐ ${T("الأكثر طلبًا", "Most popular")}</span>` : ""}</div>
+          <div class="mv-body">
+            <div><h2>${esc(it.name)}</h2><div class="mv-sub">${esc(L(d.desc))}</div></div>
+            <div class="mv-kpis"><div><small>🏨 ${T("فندق", "Hotel")}</small><b>${money(city.costs.hotel[st.tier] * d.f)}</b></div><div><small>🏠 Airbnb</small><b>${money((city.costs.hotel[st.tier] * d.f * STAY.apt[st.tier]) / 2)}</b></div><div><small>🚶 ${T("للمعالم", "To sights")}</small><b>${d.walk ? `${d.walk} ${T("د", "min")}` : T("مشي", "walk")}</b></div></div>
+            <div class="mv-tip">💡 ${tip}</div>
+            <div class="mv-spark"><small>${T("سعر الليلة كل ما بعدت عن الحي القديم (تقديري)", "Nightly price by distance from the Old Quarter (est.)")}</small>${sparkSVG(byWalk)}</div>
+            <div class="mv-cta"><a class="p" target="_blank" rel="noopener" href="https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}&group_adults=${gp.travelers}${dates}">Booking ↗</a><a class="s" target="_blank" rel="noopener" href="https://www.airbnb.com/s/${encodeURIComponent(q)}/homes?adults=${gp.travelers}${dates}">Airbnb ↗</a></div>
+          </div>`;
+      }
+      loadPhotos(sheet);
+    };
+    pinsG.addEventListener("click", (e) => {
+      const g = e.target.closest(".mv-pin"); if (!g || moved) return;
+      sel = g.dataset.id; store.set("mapSel:" + (cityId || D.id), sel); paint();
+      const it = items.find((i) => i.id === sel);
+      if (window.innerWidth <= 860) { v = { ...v, x: it.x - v.w / 2, y: it.y - v.h * 0.3 }; apply(); }
+    });
+    pinsG.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
+    document.querySelector(".mv-chips").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.layer) st.layer = b.dataset.layer;
+      if (b.dataset.tier) st.tier = b.dataset.tier;
+      if (b.hasAttribute("data-stay")) st.stay = st.stay === "apt" ? "hotel" : "apt";
+      save(); window.__mvKeep = { ...v }; render();
+    });
+    fit();
+    if (window.__mvKeep && window.__mvKeepFor === (cityId || D.id)) v = window.__mvKeep;
+    window.__mvKeep = null; window.__mvKeepFor = cityId || D.id;
+    apply(); paint();
+    window.addEventListener("resize", function onR() { if (!document.getElementById("msvg")) return window.removeEventListener("resize", onR); fit(); apply(); });
+  }
+
   function viewNotFound() {
     app.innerHTML = `<div class="wrap"><h1 class="display">${T("الصفحة مو موجودة", "Page not found")}</h1><p><a href="#/">${T("ارجع للرئيسية", "Back to home")}</a></p></div>`;
   }
@@ -1221,6 +1496,7 @@
       else if (sub === "places") viewPlaces();
       else if (sub === "before") viewBefore();
       else if (sub === "plan") viewPlan(+arg);
+      else if (sub === "map") viewMap(arg);
       else viewNotFound();
     } else if (W.continents.some((k) => k.id === parts[0])) { page = "continent"; viewContinent(parts[0]); }
     else viewNotFound();
@@ -1249,6 +1525,7 @@
     nav.innerHTML = `
       <a href="#/" data-route="world" aria-label="${T("القارات", "Continents")}"><i>🌍</i>${T("الوجهات", "Explore")}</a>
       ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}"><i>${C.flag}</i>${esc(C.name)}</a>` : ""}
+      ${C && window.MAPS && window.MAPS[C.id] ? `<a href="${base}/map" data-route="map"><i>🗺️</i>${T("الخريطة", "Map")}</a>` : ""}
       ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>${T("ميزانيتي", "Budget")}</a><a href="${base}/places" data-route="places"><i>📍</i>${T("الأماكن", "Places")}</a><a href="${base}/before" data-route="before"><i>🧳</i>${T("قبل السفر", "Prep")}</a>` : ""}`;
     nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.route === page || (page === "city" && a.dataset.route === "country") || (page === "continent" && a.dataset.route === "world")));
     const loc = curBox.querySelector('[data-cur="LOCAL"]');
