@@ -538,3 +538,27 @@ button.prow:focus-visible { outline: 3px solid var(--gold); }
   .note-row { grid-template-columns: 64px minmax(0, 1fr); }
   .dlg-in.wide { padding: 12px; }
 }
+
+/* ---------- إصلاحات الجوال ---------- */
+.topbar { transition: transform .35s var(--ease); }
+.topbar.hide { transform: translateY(-120%); }
+@media (max-width: 700px) {
+  .dlg-in.wide .trip { grid-template-columns: minmax(0, 1fr); }
+  .dlg-in.wide .trip .map { display: none; }
+}
+@media (max-width: 560px) {
+  .pill { flex-wrap: nowrap; gap: 2px; padding: 4px; width: 100%; justify-content: space-between; }
+  .topbar .wrap { padding: 0 10px; }
+  .logo { padding: 0 6px; }
+  .nav { gap: 0; }
+  .nav a { padding: 5px 8px; font-size: 0.84rem; white-space: nowrap; }
+  .currency button:not(.on) { display: none; }
+  .currency button.on { padding: 4px 10px; }
+  .currency button.on::after { content: " ⇄"; font-size: 0.7rem; opacity: .7; }
+}
+@media (max-width: 360px) { .nav a { padding: 5px 6px; font-size: 0.78rem; } }
+@media (max-width: 560px) {
+  .currency { flex-shrink: 0; }
+  .currency button.on { white-space: nowrap; font-size: 0.78rem; padding: 4px 8px; }
+  .nav { flex-shrink: 1; min-width: 0; }
+}

@@ -815,6 +815,16 @@
   }
   if (!reduced) window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(parallax); } }, { passive: true });
 
+  // الشريط يختفي مع النزول ويرجع مع الطلوع
+  const bar = document.querySelector(".topbar");
+  let lastY = window.scrollY;
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY;
+    if (Math.abs(y - lastY) < 6) return;
+    bar.classList.toggle("hide", y > lastY && y > 120);
+    lastY = y;
+  }, { passive: true });
+
   // ---------- التوجيه ----------
   function render() {
     const h = location.hash.replace(/^#\/?/, "");
@@ -847,8 +857,13 @@
   const curBox = document.getElementById("currency");
   const paintCurrency = () => curBox.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.cur === currency));
   curBox.addEventListener("click", (e) => {
-    const b = e.target.closest("button");
+    let b = e.target.closest("button");
     if (!b) return;
+    // على الجوال يظهر زر واحد، والضغط عليه ينقل للعملة اللي بعدها
+    if (b.classList.contains("on") && window.matchMedia("(max-width: 560px)").matches) {
+      const all = [...curBox.querySelectorAll("button")];
+      b = all[(all.indexOf(b) + 1) % all.length];
+    }
     currency = b.dataset.cur;
     store.set("currency", currency);
     paintCurrency();
