@@ -53,6 +53,8 @@ window.TRAVEL_DATA = {
   cities: [
     {
       id: "hanoi",
+      code: "HAN",
+      map: { x: 96, y: 62 },
       name: "هانوي",
       en: "Hanoi",
       region: "الشمال",
@@ -99,6 +101,8 @@ window.TRAVEL_DATA = {
 
     {
       id: "halong",
+      code: "VDO",
+      map: { x: 127, y: 64 },
       name: "خليج ها لونغ",
       en: "Ha Long Bay",
       region: "الشمال",
@@ -140,6 +144,8 @@ window.TRAVEL_DATA = {
 
     {
       id: "danang",
+      code: "DAD",
+      map: { x: 156, y: 187 },
       name: "دا نانغ وهوي آن",
       en: "Da Nang & Hoi An",
       region: "الوسط",
@@ -184,6 +190,8 @@ window.TRAVEL_DATA = {
 
     {
       id: "hcmc",
+      code: "SGN",
+      map: { x: 117.5, y: 318 },
       name: "هو تشي منه (سايغون)",
       en: "Ho Chi Minh City",
       region: "الجنوب",
@@ -229,6 +237,8 @@ window.TRAVEL_DATA = {
 
     {
       id: "phuquoc",
+      code: "PQC",
+      map: { x: 49, y: 332 },
       name: "فو كوك",
       en: "Phu Quoc",
       region: "الجنوب",
