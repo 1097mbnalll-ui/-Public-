@@ -31,6 +31,24 @@
   const EN_ON = store.get("lang", "ar") === "en";
   const T = (ar, en) => (EN_ON ? en : ar);
   const FWD = EN_ON ? "→" : "←";
+  // تقييم رحّال: تقييم تحريري من 5 (مو تقييم زوار). يُحسب من النص العربي قبل الترجمة عشان يطلع نفسه باللغتين
+  (function rateAll() {
+    const big = /من أجمل|أجمل|أشهر|أكبر|أفضل|أعظم|أعلى|أقدم|رمز|خرافي|تحفة|روائع/;
+    Object.values(W.countries).forEach((c) => c.cities.forEach((x) => {
+      const n = x.places.filter((p) => !p.gem).length;
+      let i = 0;
+      x.places.forEach((p) => {
+        if (p.rating) return;
+        // الأماكن مرتبة من الأهم في كل مدينة
+        let r = p.gem ? 4.55 : 4.75 - (i++ / Math.max(1, n - 1)) * 0.55;
+        if (/التراث العالمي/.test(p.desc)) r += 0.12;
+        if (big.test(p.desc)) r += 0.08;
+        let h = 0; for (const ch of p.wiki || p.name) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+        r += ((h % 11) - 5) / 100;
+        p.rating = Math.max(4.0, Math.min(4.9, Math.round(r * 10) / 10));
+      });
+    }));
+  })();
   if (EN_ON && window.applyEnglish) window.applyEnglish();
   document.documentElement.lang = EN_ON ? "en" : "ar";
   document.documentElement.dir = EN_ON ? "ltr" : "rtl";
@@ -198,6 +216,11 @@
   // ---------- بطاقة المكان ونافذة التفاصيل ----------
 
 
+  // نجوم التقييم مع الكسور
+  function starsHTML(r, big) {
+    const pct = (r / 5) * 100;
+    return `<span class="stars ${big ? "big" : ""}" title="${T("تقييم رحّال", "Wayfarer rating")}: ${r.toFixed(1)} / 5"><span class="st-bg">★★★★★</span><span class="st-fg" style="width:${pct}%">★★★★★</span></span><b class="st-num">${r.toFixed(1)}</b>`;
+  }
   function placeCard(p, { showCity = false } = {}) {
     return `
       <button type="button" class="pcard" data-place="${p.key}">
@@ -207,6 +230,7 @@
           ${showCity ? `<span class="pcard-city">${esc(p.city.name)}</span>` : ""}
           <span class="pcard-name">${esc(p.name)}</span>
           <span class="pcard-desc">${esc(p.desc)}</span>
+          <span class="pcard-rate">${starsHTML(p.rating)}</span>
           <span class="pcard-meta"><b>${p.fee ? money(p.fee) : T("مجانًا", "Free")}</b><span>⏱ ${esc(p.time)}</span></span>
         </span>
       </button>`;
@@ -252,6 +276,7 @@
         <div class="dlg-body">
           <a class="pcard-city" href="${B()}/city/${p.city.id}" data-close>${esc(p.city.name)}</a>
           <h2>${esc(p.name)}</h2>
+          <div class="dlg-rate">${starsHTML(p.rating, true)}<small>${T("تقييم رحّال: رأي تحريري من فريق الموقع، مو من تقييمات الزوار.", "Wayfarer rating: our editorial score, not visitor reviews.")}</small></div>
           ${p.gem ? `<p class="gem-line">💎 ${T("جوهرة مخفية: مكان رائع، وقليل من السياح يعرفونه.", "Hidden gem: a wonderful place that few tourists know about.")}</p>` : ""}
           <div class="about">
             <p class="about-desc">${esc(p.desc)}</p>
@@ -277,8 +302,11 @@
 
   // ---------- مدخل الميزانية ----------
   const DEFAULT = { budgetSAR: 6000, days: 7, travelers: 2, interests: [], flights: false };
-  const getPlan = () => { const p = { ...DEFAULT, ...store.get("budgetPlanSAR", {}) }; p.budget = p.budgetSAR * (D ? D.currency.perSAR : 1); return p; };
-  const savePlan = (p) => { const { budget, ...rest } = p; store.set("budgetPlanSAR", { ...rest, budgetSAR: budget / D.currency.perSAR }); };
+  // budgetSAR هو المبلغ اللي كتبه المستخدم، وbudgetMode يحدد هل هو للمجموعة (total) أو للشخص (pp)
+  const totalSAR = (p) => p.budgetSAR * (p.budgetMode === "pp" ? p.travelers : 1);
+  const getPlan = () => { const p = { budgetMode: "total", ...DEFAULT, ...store.get("budgetPlanSAR", {}) }; p.budget = totalSAR(p) * (D ? D.currency.perSAR : 1); return p; };
+  const savePlan = (p) => { const { budget, ...rest } = p; const mode = rest.budgetMode || store.get("budgetPlanSAR", {}).budgetMode || "total"; store.set("budgetPlanSAR", { ...rest, budgetMode: mode, budgetSAR: budget / D.currency.perSAR / (mode === "pp" ? rest.travelers : 1) }); };
+  const modeSelect = (mode) => `<select name="m" class="mode-sel" aria-label="${T("المبلغ لمين", "Budget is for")}"><option value="total" ${mode !== "pp" ? "selected" : ""}>${T("للمجموعة", "for the group")}</option><option value="pp" ${mode === "pp" ? "selected" : ""}>${T("للشخص", "per person")}</option></select>`;
   const presetsFor = (cur) => (cur === "SAR" ? [3000, 5000, 8000, 12000, 20000] : cur === "USD" ? [800, 1500, 2000, 3000, 5000] : [3000, 5000, 8000, 12000, 20000].map((v) => { const x = v * D.currency.perSAR; const m = 10 ** Math.floor(Math.log10(x)); return Math.round(x / m) * m; }));
 
 
@@ -319,16 +347,16 @@
       </section>`;
   }
   const selectOpts = (arr, cur, word) => arr.map((d) => `<option ${d === cur ? "selected" : ""} value="${d}">${word(d)}</option>`).join("");
-  function ticketForm(id, { amount, unit, days, travelers, go }) {
+  function ticketForm(id, { amount, unit, days, travelers, go, mode }) {
     return `
       <form class="ticket" id="${id}">
-        <label class="f"><small>${T("الميزانية", "Budget")} (${unit})</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="${T("الميزانية", "Budget")}"></label>
+        <label class="f"><small>${T("الميزانية", "Budget")} (${unit}) ${modeSelect(mode)}</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="${T("الميزانية", "Budget")}"></label>
         <label class="f"><small>${T("المدة", "Trip length")}</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], days, dayWord)}</select></label>
         <label class="f"><small>${T("المسافرين", "Travellers")}</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], travelers, paxWord)}</select></label>
         <button class="go" type="submit">${go} ${FWD}</button>
       </form>`;
   }
-  const readTicket = (f) => ({ b: parseFloat(f.b.value.replace(/[^\d.]/g, "")) || 0, d: +f.d.value, t: +f.t.value });
+  const readTicket = (f) => ({ b: parseFloat(f.b.value.replace(/[^\d.]/g, "")) || 0, d: +f.d.value, t: +f.t.value, m: f.m.value });
 
   // ---------- الصفحة الرئيسية: القارات ----------
   const readyIn = (cont) => Object.values(W.countries).filter((c) => c.continent === cont);
@@ -342,7 +370,8 @@
       kick: T("🌏 دليلك العربي للسفر", "🌏 Travel planning that starts with your budget"),
       title: T("ميزانيتك", "Your budget,"), sub: T("توديك وين؟", "where can it take you?"),
       lead: T("اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend, and we'll pin up a poster for every country it covers — how many days, what comfort level, and what you'll have left."),
-      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, go: T("وين تكفيني؟", "Where can I go?") }) +
+      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, mode: st.budgetMode, go: T("وين تكفيني؟", "Where can I go?") }) +
+        `<button type="button" class="dice-btn hero-dice" data-surprise>🎲 ${T("فاجئني بدولة وخطة", "Surprise me with a country")}</button>` +
         `<a class="app-chip" href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("حمّل تطبيق الأندرويد", "Get the Android app")}</a>`,
       poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T("آسيا<br>7 دول<br>جاهزة", "Asia<br>7 countries<br>ready") },
     }) + `
@@ -355,11 +384,34 @@
     document.getElementById("worldBudget").addEventListener("submit", (e) => {
       e.preventDefault();
       const t = readTicket(e.target);
-      store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t });
+      store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = "#/asia";
     });
     loadPhotos(app);
   }
+
+  // ---------- فاجئني: دولة عشوائية تناسب الميزانية مع خطة جاهزة ----------
+  function surpriseMe(sameCountry) {
+    const st = { budgetMode: "total", ...DEFAULT, ...store.get("budgetPlanSAR", {}) };
+    let pool = Object.values(W.countries);
+    if (sameCountry && D) pool = [W.countries[D.id]];
+    else {
+      const prev = D;
+      const fitting = pool.filter((C) => { setCountry(C); return buildOptions({ ...st, interests: st.interests || [], budget: totalSAR(st) * C.currency.perSAR }).fits.length; });
+      if (prev) setCountry(prev);
+      if (fitting.length) pool = fitting;
+    }
+    const C = pool[Math.floor(Math.random() * pool.length)];
+    store.set("surprise", 1);
+    const target = `#/c/${C.id}/plan`;
+    if (location.hash === target) render(); else location.hash = target;
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-surprise]");
+    if (!b) return;
+    e.preventDefault();
+    surpriseMe(b.dataset.surprise === "here");
+  });
 
   // ---------- صفحة القارة: الدول ووين تكفي الميزانية ----------
   function viewContinent(cid) {
@@ -375,10 +427,11 @@
           <p class="lead">${T(`${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.`, `${list.length} non-Arab countries. ${readyIn(cid).length} are fully covered, with more added all the time.`)}</p>
         </div>
         <form class="fit-form" id="fitForm" onsubmit="return false">
-          <label>${T("ميزانيتي", "My budget")} <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ${T("ريال", "SAR")}</label>
+          <label>${T("ميزانيتي", "My budget")} <input id="fb" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}"> ${T("ريال", "SAR")} <select id="fm" class="mode-sel">${modeSelect(st.budgetMode).replace(/^<select[^>]*>|<\/select>$/g, "")}</select></label>
           <label>${T("لمدة", "for")} <select id="fd">${[4, 5, 7, 10, 14].map((d) => `<option ${d === st.days ? "selected" : ""} value="${d}">${dayWord(d)}</option>`).join("")}</select></label>
           <label>${T("لـ", "with")} <select id="ft">${[1, 2, 3, 4, 5, 6].map((d) => `<option ${d === st.travelers ? "selected" : ""} value="${d}">${paxWord(d)}</option>`).join("")}</select></label>
           <label class="toggle-inline"><input type="checkbox" id="ff" ${st.flights ? "checked" : ""}> ${T("شامل الطيران", "incl. flights")}</label>
+          <button type="button" class="dice-btn" data-surprise>🎲 ${T("فاجئني بدولة", "Surprise me")}</button>
         </form>
         <div id="fit"></div>
         <section class="band">
@@ -399,12 +452,14 @@
         budgetSAR: parseFloat(document.getElementById("fb").value.replace(/[^\d.]/g, "")) || 0,
         days: +document.getElementById("fd").value, travelers: +document.getElementById("ft").value,
         flights: document.getElementById("ff").checked,
+        budgetMode: document.getElementById("fm").value,
       };
       store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...s2 });
+      const groupSAR = totalSAR(s2);
       const prev = D;
       const rows = readyIn(cid).map((C) => {
         setCountry(C);
-        const s = { ...DEFAULT, ...s2, interests: [], budget: s2.budgetSAR * C.currency.perSAR };
+        const s = { ...DEFAULT, ...s2, interests: [], budget: groupSAR * C.currency.perSAR };
         const { fits, over } = buildOptions(s);
         const best = fits[0] || over[0];
         return { C, fits: fits.length, best, total: best ? best.total / C.currency.perSAR : 0, ok: !!fits.length, route: best ? best.route.map((x) => x.short).join(` ${FWD} `) : "", tier: best ? best.tier : "" };
@@ -420,7 +475,8 @@
             <div class="art">${scene(r.C.scene, true)}</div>
             <h4>${esc(r.C.name)}</h4>
             <p class="pline">${r.ok ? `${optWord(r.fits)} · ${T("أفضلها", "best:")} ${esc(W.tiers[r.tier].name)}` : T(`ما تكفي ${dayWord(s2.days)}`, `Not enough for ${dayWord(s2.days)}`)}<br><small>${esc(r.route)}</small></p>
-            <div class="meta"><span>${r.ok ? T("يبقى معك", "Left over") : T("ينقصك", "Short by")}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(s2.budgetSAR - r.total))}</b></div>
+            <div class="meta"><span>${r.ok ? T("يبقى معك", "Left over") : T("ينقصك", "Short by")}</span><b class="${r.ok ? "" : "neg"}">${sar(Math.abs(groupSAR - r.total))}</b></div>
+            <div class="meta pp"><span>${T("على الشخص", "Per person")}</span><b>${sar(r.total / s2.travelers)}</b></div>
           </a>`).join("")}</div>`;
     };
     form.addEventListener("input", update);
@@ -452,7 +508,7 @@
             <div>${T("الوجهات", "Destinations")}<b>${T(`${D.cities.length} وجهة · ${allPlaces.length} مكان`, `${D.cities.length} destinations · ${allPlaces.length} places`)}</b></div>
           </div>
         </div>
-        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate()), unit: curName(), days: plan.days, travelers: plan.travelers, go: T("وريني الخيارات", "Show my options") })}`,
+        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate() / (plan.budgetMode === "pp" ? plan.travelers : 1)), unit: curName(), days: plan.days, travelers: plan.travelers, mode: plan.budgetMode, go: T("وريني الخيارات", "Show my options") })}`,
       poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: T(`${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, `${top.places.length} places · ${dayWord(top.days.ideal)} suggested`), stamp: T(`${D.cities.length}<br>وجهات`, `${D.cities.length}<br>stops`) },
     }) + `
       <div class="wrap">
@@ -489,7 +545,7 @@
     document.getElementById("heroBudget").addEventListener("submit", (e) => {
       e.preventDefault();
       const t = readTicket(e.target);
-      savePlan({ ...getPlan(), ...(t.b > 0 ? { budget: t.b * rate() } : {}), days: t.d, travelers: t.t });
+      savePlan({ ...getPlan(), ...(t.b > 0 ? { budget: t.b * rate() * (t.m === "pp" ? t.t : 1) } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = B() + "/plan";
     });
     loadPhotos(app);
@@ -590,6 +646,7 @@
           <div class="chips">
             ${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="ft" value="${k}" ${f.types.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}
             <label class="chip"><input type="checkbox" id="ff" ${f.free ? "checked" : ""}><span>💸 ${T("مجانية فقط", "Free only")}</span></label>
+            <label class="chip"><input type="checkbox" id="fsort" ${f.sort ? "checked" : ""}><span>⭐ ${T("الأعلى تقييمًا", "Top rated")}</span></label>
             <label class="chip"><input type="checkbox" id="fgem" ${f.gem ? "checked" : ""}><span>💎 ${T("جواهر مخفية", "Hidden gems")}</span></label>
           </div>
         </div>
@@ -604,6 +661,7 @@
         types: [...app.querySelectorAll("input[name=ft]:checked")].map((i) => i.value),
         free: document.getElementById("ff").checked,
         gem: document.getElementById("fgem").checked,
+        sort: document.getElementById("fsort").checked,
       };
       store.set("placeFilter", st);
       const res = allPlaces.filter((p) =>
@@ -613,6 +671,7 @@
         (!st.gem || p.gem) &&
         (!st.q || (p.name + p.desc + p.city.name).includes(st.q)));
       document.getElementById("fcount").textContent = res.length ? `${res.length} ${T("مكان", "places")}` : T("ما لقينا أماكن بهالفلتر. جرّب تشيل بعض الخيارات.", "Nothing matches these filters. Try removing a few.");
+      if (st.sort) res.sort((a, b) => b.rating - a.rating);
       list.innerHTML = res.map((p) => placeCard(p, { showCity: !st.city })).join("");
       loadPhotos(list);
     };
@@ -788,7 +847,7 @@
   function viewPlan(preset) {
     const s = getPlan();
     if (preset >= 3 && preset <= 21) s.days = preset;
-    const amount = Math.round(s.budget / rate());
+    const amount = Math.round(s.budget / rate() / (s.budgetMode === "pp" ? s.travelers : 1));
     app.innerHTML = `
       <div class="wrap">
         <div class="page-title">
@@ -797,8 +856,16 @@
         </div>
         <div class="planner">
           <form class="form" id="planForm" onsubmit="return false">
+            <div class="dice-row">
+              <button type="button" class="dice-btn" data-surprise="here">🎲 ${T("خطة عشوائية هنا", "Random plan here")}</button>
+              <button type="button" class="dice-btn" data-surprise>🌏 ${T("دولة عشوائية", "Random country")}</button>
+            </div>
             <div class="field">
-              <label for="budget">${T("الميزانية الكاملة", "Total budget")} <output>${curName()}</output></label>
+              <label for="budget">${T("الميزانية", "Budget")} <output>${curName()}</output></label>
+              <div class="seg" role="radiogroup" aria-label="${T("المبلغ لمين", "Budget is for")}">
+                <label><input type="radio" name="bmode" value="total" ${s.budgetMode !== "pp" ? "checked" : ""}><span>${T("للمجموعة كاملة", "For the whole group")}</span></label>
+                <label><input type="radio" name="bmode" value="pp" ${s.budgetMode === "pp" ? "checked" : ""}><span>${T("للشخص الواحد", "Per person")}</span></label>
+              </div>
               <input class="money-in" id="budget" inputmode="numeric" value="${fmt(amount)}">
               <div class="chips" style="margin-top:10px">${presetsFor(currency).map((v) => `<button type="button" class="chip-btn" data-b="${v}">${fmt(v)}</button>`).join("")}</div>
             </div>
@@ -826,13 +893,17 @@
     const resEl = document.getElementById("result");
     const budgetIn = document.getElementById("budget");
     let timer;
-    const read = () => ({
-      budget: (parseFloat(budgetIn.value.replace(/[^\d.]/g, "")) || 0) * rate(),
+    const read = () => {
+      const travelers = +form.travelers.value;
+      const budgetMode = form.querySelector("input[name=bmode]:checked").value;
+      return {
+      budgetMode,
+      budget: (parseFloat(budgetIn.value.replace(/[^\d.]/g, "")) || 0) * rate() * (budgetMode === "pp" ? travelers : 1),
       days: +form.days.value,
-      travelers: +form.travelers.value,
+      travelers,
       interests: [...form.querySelectorAll("input[name=interest]:checked")].map((i) => i.value),
       flights: form.flights.checked,
-    });
+    }; };
     const update = (now) => {
       const st = read();
       document.getElementById("daysOut").textContent = dayWord(st.days);
@@ -868,6 +939,7 @@
           </div>
           <button type="button" class="tkt-stub" data-opt="${i}">
             <small>${T("التكلفة", "Total")}</small><b>${money(r.total)}</b>
+            <small class="pp">${T("على الشخص", "per person")} ${money(r.total / s.travelers)}</small>
             <em class="${isOver ? "neg" : ""}">${isOver ? T("ينقصك", "Short") : T("يبقى", "Left")} ${money(Math.abs(left))}</em>
             <span class="see">${T("شوف البرنامج", "See the plan")}</span>
           </button>
@@ -894,6 +966,7 @@
         ${fits.length
           ? T(`لقينا لك ${optWord(fits.length)} تناسب ميزانيتك ${money(s.budget)} لـ ${paxWord(s.travelers)} و${dayWord(s.days)}.`, `We found ${optWord(fits.length)} that fit your ${money(s.budget)} budget for ${paxWord(s.travelers)} over ${dayWord(s.days)}.`)
           : T(`ميزانيتك ${money(s.budget)} ما تكفي ${dayWord(s.days)} لـ ${paxWord(s.travelers)} في أي مسار. هذي أقرب الخيارات، أو قلّل الأيام.`, `${money(s.budget)} doesn't stretch to ${dayWord(s.days)} for ${paxWord(s.travelers)} on any route. Here are the closest options — or try fewer days.`)}
+        <div class="pp-line">${T("ميزانيتك", "Your budget")}: <b>${money(s.budget)}</b> ${T("للمجموعة", "for the group")} · <b>${money(s.budget / s.travelers)}</b> ${T("على الشخص الواحد", "per person")}</div>
         <span class="hint">${s.flights ? T("شامل تذاكر الطيران الدولي (تقدير).", "Includes international flights (estimate).") : T("بدون تذاكر الطيران الدولي.", "Excludes international flights.")} ${T("شامل التأشيرة والسكن والأكل والتنقل والرسوم.", "Covers visa, hotels, food, transport and entry fees.")}</span>
       </div>
       <div class="opts">${lastOptions.map((r, i) => optCard(r, i, !fits.length)).join("")}</div>
@@ -904,6 +977,11 @@
         <div class="dests">${destCards}</div>
       </section>`;
     loadPhotos(resEl);
+    if (store.get("surprise", 0) && lastOptions.length) {
+      store.set("surprise", 0);
+      const pick = lastOptions[Math.floor(Math.random() * Math.min(lastOptions.length, 12))];
+      setTimeout(() => openOption(pick, s), 250);
+    }
     resEl.querySelectorAll("[data-opt]").forEach((b) => b.addEventListener("click", () => openOption(lastOptions[+b.dataset.opt], s)));
   }
 
@@ -925,7 +1003,7 @@
           <div class="pday">
             <div class="pday-n"><small>${T("اليوم", "Day")}</small>${d.day}</div>
             <div class="pday-items">${d.items.map((it) => it.p
-              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
+              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>★ ${it.p.rating.toFixed(1)} · ${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
               : `<div class="prow note-row"><span class="note-ico">${noteIco(it)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
           </div>`).join("")}
       </section>`).join("");
