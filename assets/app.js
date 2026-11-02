@@ -1092,29 +1092,43 @@
   function buildOptions(s) {
     const budget = s.budget;
     const fits = [], over = [];
+    const tierRank = { lux: 3, mid: 2, eco: 1 };
+    const pref = s.prefs || {};
+    const hotelNight = hotelNightOf(s);
+    // كل التركيبات الممكنة: سكن × أكل × تنقل (27)، إلا البنود اللي حددها المستخدم
+    const opts = PREF_KEYS.map((k) => (pref[k] && pref[k] !== "auto" ? [pref[k]] : k === "hotel" && hotelNight ? ["mid"] : ["lux", "mid", "eco"]));
+    const combos = [];
+    for (const h of opts[0]) for (const f of opts[1]) for (const t of opts[2]) combos.push({ hotel: h, food: f, transport: t });
+    const comfort = (r) => tierRank[r.tiers.hotel] * 1.6 + tierRank[r.tiers.food] + tierRank[r.tiers.transport] * 0.8;
     for (const route of candidates(s.days, s.interests)) {
-      // كل مستوى يناسب الميزانية خيار مستقل
-      // كل بند (سكن، أكل، تنقل) إما محدد من المستخدم أو تلقائي يتغير مع المستوى
-      const pref = s.prefs || {};
-      const hotelNight = hotelNightOf(s);
-      let cheapest = null, any = false;
-      const tried = new Set();
-      for (const tier of ["lux", "mid", "eco"]) {
-        const tiers = Object.fromEntries(PREF_KEYS.map((k) => [k, pref[k] && pref[k] !== "auto" ? pref[k] : tier]));
-        const key = PREF_KEYS.map((k) => (k === "hotel" && hotelNight ? "custom" : tiers[k])).join("-");
-        if (tried.has(key)) continue;
-        tried.add(key);
-        const r = planRoute(route, { ...s, tier, tiers, stay: pref.stay || "hotel", hotelNight });
+      const ok = [];
+      let cheapest = null;
+      for (const tiers of combos) {
+        const tier = [tiers.hotel, tiers.food, tiers.transport].sort((x, y) => tierRank[y] - tierRank[x])[0];
+        const r = planRoute(route, { ...s, tier: tiers.hotel, tiers, stay: pref.stay || "hotel", hotelNight });
         if (!r) break;
         r.total = totalOf(r, s.flights, s.travelers);
-        cheapest = r;
-        if (r.total <= budget) { fits.push(r); any = true; }
+        r.comfort = comfort(r);
+        if (!cheapest || r.total < cheapest.total) cheapest = r;
+        if (r.total <= budget) ok.push(r);
       }
-      if (!any && cheapest) over.push(cheapest);
+      if (!ok.length) { if (cheapest) over.push(cheapest); continue; }
+      // لكل مسار: أفخم تركيبة تكفيها الميزانية، ونسخة متوسطة، ونسخة اقتصادية (إذا تختلف)
+      ok.sort((x, y) => y.comfort - x.comfort || y.total - x.total);
+      const keep = [ok[0]];
+      const mid = ok.find((r) => r.tiers.hotel === "mid" && r.tiers.food === "mid");
+      const eco = ok.find((r) => r.tiers.hotel === "eco" && r.tiers.food === "eco" && r.tiers.transport === "eco");
+      [mid, eco].forEach((r) => { if (r && !keep.includes(r)) keep.push(r); });
+      fits.push(...keep);
     }
-    const tierRank = { lux: 3, mid: 2, eco: 1 };
-    const value = (r) => r.route.reduce((a, c) => a + score(c, s.interests) * r.alloc.get(c), 0) / s.days + PREF_KEYS.reduce((a, k) => a + tierRank[r.tiers[k]], 0) * 0.4 + r.route.length * 0.15;
-    fits.sort((a, b) => value(b) - value(a));
+    // الترتيب: كم تستفيد من ميزانيتك (فخامة أعلى وأقرب للحد الأقصى) + مدى مناسبة المدن لذوقك
+    const value = (r) => {
+      const use = r.total / budget;
+      return r.route.reduce((a, c) => a + score(c, s.interests) * r.alloc.get(c), 0) / s.days * 0.8
+        + r.comfort * 0.55 + (use > 0.97 ? 1.6 : use * 1.8) + r.route.length * 0.1;
+    };
+    fits.forEach((r) => { r.value = value(r); });
+    fits.sort((a, b) => b.value - a.value);
     over.sort((a, b) => a.total - b.total);
     return { fits, over };
   }
@@ -1370,7 +1384,7 @@
       const take = (r, kind) => { if (r && !used.has(r)) { used.add(r); picks.push([r, kind]); } };
       take(fits[0], "best");
       take([...fits].filter((r) => !used.has(r)).sort((a, b) => a.total - b.total)[0], "cheap");
-      take([...fits].filter((r) => !used.has(r)).sort((a, b) => tierRank[b.tier] - tierRank[a.tier] || b.total - a.total)[0], "lux");
+      take([...fits].filter((r) => !used.has(r)).sort((a, b) => (b.comfort || 0) - (a.comfort || 0) || b.total - a.total)[0], "lux");
     }
     const KIND = { best: ["", T("الأنسب لك", "Best for you")], cheap: ["c", T("الأوفر", "Best value")], lux: ["l", T("الأفخم", "Most luxurious")] };
     const stopsTxt = (n) => (EN_ON ? (n === 1 ? "1 city" : n + " cities") : n === 1 ? "مدينة وحدة" : n === 2 ? "مدينتين" : n + " مدن");
