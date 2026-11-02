@@ -29,6 +29,26 @@ window.VISA_YE = {
     ye: ["تحتاج تأشيرة من السفارة الأذربيجانية، والتأشيرة الإلكترونية ASAN غالبًا ما تكون متاحة للجواز اليمني.", "You need a visa from an Azerbaijani embassy; the ASAN e-visa usually isn't open to Yemeni passports."],
     res: ["قدّم عن طريق سفارة أذربيجان في الرياض. بعض المصادر تطلب إقامة سارية 6 شهور.", "Apply through the Azerbaijani embassy in Riyadh. Some sources ask for at least 6 months left on the iqama."],
   },
+  laos: {
+    ye: ["غالبًا تحتاج تأشيرة مسبقة من سفارة لاوس، لأن التأشيرة الإلكترونية وعند الوصول قد لا تشمل الجواز اليمني. تأكد من السفارة.", "You'll most likely need a visa in advance from a Lao embassy — the e-visa and visa on arrival may not cover Yemeni passports. Check with the embassy."],
+    res: ["قدّم عبر أقرب سفارة للاوس مع صورة الإقامة السعودية. تأكد من الشروط.", "Apply through the nearest Lao embassy with a copy of your Saudi iqama. Check the requirements."],
+  },
+  cambodia: {
+    ye: ["التأشيرة الإلكترونية الرسمية (evisa.gov.kh) غالبًا متاحة لليمنيين بحوالي 36 دولار. تأكد قبل السفر.", "The official e-visa (evisa.gov.kh) is usually available to Yemenis for about $36. Check before you travel."],
+    res: ["نفس التأشيرة الإلكترونية، والإقامة تفيد كإثبات سفر. تأكد.", "The same e-visa; your iqama helps as supporting proof. Check."],
+  },
+  nepal: {
+    ye: ["حسب المصادر: تأشيرة عند الوصول متاحة لأغلب الجنسيات ومنها اليمنية (15 يوم بحوالي 30 دولار). تأكد قبل السفر.", "Per available sources, visa on arrival is open to most nationalities including Yemen (15 days for about $30). Check before you travel."],
+    res: ["نفس التأشيرة عند الوصول، وخذ الإقامة معك.", "The same visa on arrival — carry your iqama."],
+  },
+  armenia: {
+    ye: ["غالبًا تحتاج تأشيرة مسبقة من سفارة أرمينيا أو عبر البوابة الإلكترونية إذا كانت متاحة لجوازك. تأكد من السفارة.", "You'll most likely need a visa in advance from an Armenian embassy, or via the e-visa portal if it accepts your passport. Check with the embassy."],
+    res: ["قدّم مع صورة الإقامة السعودية وكشف حساب. تأكد من الشروط.", "Apply with a copy of your Saudi iqama and a bank statement. Check the requirements."],
+  },
+  tajikistan: {
+    ye: ["حسب المصادر: التأشيرة الإلكترونية لطاجيكستان متاحة لأغلب الجنسيات. تأكد أن الجواز اليمني مشمول قبل السفر.", "Per available sources, Tajikistan's e-visa is open to most nationalities. Confirm Yemeni passports are covered before you travel."],
+    res: ["نفس التأشيرة الإلكترونية، وأضف تصريح GBAO لو بتروح البامير.", "The same e-visa — add the GBAO permit if you're heading to the Pamirs."],
+  },
 };
 
 Object.assign(window.VISA_YE, {

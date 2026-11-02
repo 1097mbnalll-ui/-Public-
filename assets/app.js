@@ -560,82 +560,144 @@
   function viewCity(id) {
     const c = cityById[id];
     if (!c) return viewNotFound();
-
-    const tierRows = [
-      [T("السكن (لليلة، غرفة لشخصين)", "Stay (per night, room for two)"), c.costs.hotel],
-      [T("شقة Airbnb كاملة (لليلة، تكفي 4) — تقدير", "Whole Airbnb flat (per night, sleeps 4) — est."), Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.apt[t])]))],
-      [T("غرفة خاصة في Airbnb (لليلة) — تقدير", "Private Airbnb room (per night) — est."), Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.room)]))],
-      [T("الأكل (للشخص في اليوم)", "Food (per person per day)"), c.costs.food],
-      [T("التنقل داخل المدينة (للشخص في اليوم)", "Getting around (per person per day)"), c.costs.transport],
-    ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num" data-l="${esc(D.tiers[t].name)}">${v[t] ? money2(v[t]) : `<span class='sub'>${T("مشمول", "Included")}</span>`}</td>`).join("")}</tr>`).join("");
-
-    const places = c.places.map((p, i) => placeCard({ ...p, city: c, key: D.id + ":" + c.id + ":" + i })).join("");
-    const areas = c.stayAreas.map((a) => `<div class="area"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
-    const mosques = c.halal.mosques.length
-      ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
-      : `<p>${T("ما فيه مساجد معروفة قريبة للسياح.", "No well-known mosques near the tourist areas.")}</p>`;
-    const near = D.cities.filter((o) => o !== c).map((o) => ({ o, t: travel(c, o) })).sort((a, b) => a.t.hours - b.t.hours).slice(0, 6)
-      .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td data-l="${T("الطريقة", "How")}">${esc(t.mode)}</td><td data-l="${T("المدة", "Time")}">${hoursText(t.hours)}</td><td class="num" data-l="${T("من (للشخص)", "From (pp)")}">${money2(t.cost.eco)}</td></tr>`).join("");
+    const gp = getPlan();
+    const ps = allPlaces.filter((p) => p.city === c);
+    const avg = ps.reduce((a, p) => a + p.rating, 0) / (ps.length || 1);
+    const tops = [...ps].sort((a, b) => b.rating - a.rating).slice(0, 3);
+    const rest = ps.filter((p) => !tops.includes(p));
+    const types = [...new Set(ps.map((p) => p.type))];
+    const TR = { nature: "🏞️", history: "🏛️", beach: "🏖️", food: "🍜", fun: "🎡" };
+    const who = [c.interests.fun >= 2 || c.interests.beach >= 2 ? T("👨‍👩‍👧 العوائل", "👨‍👩‍👧 Families") : "", c.interests.beach >= 2 || c.interests.nature >= 3 ? T("💑 الأزواج", "💑 Couples") : "", c.interests.nature >= 3 ? T("🥾 محبي المغامرة", "🥾 Adventurers") : "", c.interests.history >= 3 ? T("🏛️ محبي التاريخ", "🏛️ History lovers") : "", c.interests.food >= 2 ? T("🍜 محبي الأكل", "🍜 Foodies") : "", T("🎒 المسافر بميزانية", "🎒 Budget travellers")].filter(Boolean).slice(0, 4);
+    const card = (p, big) => `
+      <button type="button" class="cx-pc ${big ? "big" : ""}" data-place="${p.key}" data-type="${p.type}">
+        <span class="cx-ph">${photoBox(p)}${p.gem ? `<span class="cx-gem">💎 ${T("جوهرة مخفية", "Hidden gem")}</span>` : ""}<span class="cx-rate">★ ${p.rating.toFixed(1)}</span></span>
+        <span class="cx-pb"><small>${ICONS[p.type] || "📍"} ${esc(D.interests[p.type] || "")}</small><b>${esc(p.name)}</b><span class="cx-pd">${esc(p.desc)}</span>
+        <span class="cx-pm"><em>${p.fee ? money(p.fee) : T("مجانًا", "Free")}</em><span>⏱ ${esc(p.time)}</span></span></span>
+      </button>`;
+    const costRow = (ico, label, sub, v) => `<div class="cx-cost">${TIERS.map((t) => `<div data-t="${t}"><span class="cx-ci">${ico}</span><span class="cx-cl"><b>${label}</b><small>${sub}</small></span><span class="cx-cv">${v[t] ? money2(v[t]) : `<span class="sub">${T("مشمول", "Included")}</span>`}</span></div>`).join("")}</div>`;
+    const apt = Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.apt[t])]));
+    const room = Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.room)]));
+    const dayTot = Object.fromEntries(TIERS.map((t) => [t, c.costs.hotel[t] / 2 + c.costs.food[t] + c.costs.transport[t]]));
+    const near = D.cities.filter((o) => o !== c).map((o) => ({ o, t: travel(c, o) })).sort((a, b) => a.t.hours - b.t.hours).slice(0, 6);
+    const nights = gp.startDate && gp.endDate ? tripDays(gp.startDate, gp.endDate) - 1 : 0;
 
     app.innerHTML = `
-      ${posterHero({
-        kick: `<a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ${T("‹", "›")} <a href="${B()}">${D.flag} ${esc(D.name)}</a>`,
-        title: esc(c.name),
-        lead: esc(c.summary),
-        body: `<div class="tags">${Object.entries(c.interests).filter(([, v]) => v >= 2).map(([k]) => `<span class="tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("")}</div>`,
-        poster: { art: cityScene(c, true), wiki: cityWiki(c), title: c.short || c.name, caption: `${D.flag} ${esc(D.name)} · ${esc(c.region)}`, stamp: `${c.places.length}<br>${T("مكان", "places")}` },
-      })}
-
-      <div class="wrap city-grid">
-        <div>
-          <section class="block">
-            <h2>${T("وش تزور؟", "What to see")} <small class="count">${c.places.length} ${T("مكان", "places")}</small></h2>
-            <div class="pgrid">${places}</div>
-          </section>
-
-          <section class="block">
-            <h2>${T("كم بتصرف؟", "What it costs")}</h2>
-            <div class="table-wrap"><table class="cost-t">
-              <thead><tr><th></th>${TIERS.map((t) => `<th>${D.tiers[t].name}</th>`).join("")}</tr></thead>
-              <tbody>${tierRows}</tbody>
-            </table></div>
-            ${c.costs.note ? `<p class="hint">${esc(c.costs.note)}</p>` : ""}
-            ${src(c.costs.src, c.costs.date, "numbeo")}
-          </section>
-
-          <section class="block">
-            <h2>${T("وين تسكن؟", "Where to stay")}</h2>
-            <div class="areas">${areas}</div>
-          </section>
-
-          <section class="block">
-            <h2>${T("الأكل الحلال والمساجد", "Halal food & mosques")}</h2>
-            <div class="note">${mosques}<p style="margin:10px 0 0">${esc(c.halal.food)}</p>${src(c.halal.src, c.halal.date)}</div>
-          </section>
-
-          <section class="block">
-            <h2>${T("التنقل", "Getting around")}</h2>
-            <ul class="clean">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
-            <h3 style="margin-top:22px">${T(`أقرب الوجهات من ${esc(c.name)}`, `Nearest stops from ${esc(c.name)}`)}</h3>
-            <div class="table-wrap"><table class="near-t">
-              <thead><tr><th>${T("إلى", "To")}</th><th>${T("الطريقة", "How")}</th><th>${T("المدة", "Time")}</th><th>${T("من (للشخص)", "From (per person)")}</th></tr></thead>
-              <tbody>${near}</tbody>
-            </table></div>
-            <p class="hint">${T("المدد والأسعار تقديرية محسوبة من المسافة.", "Times and prices are estimates based on distance.")}</p>
-          </section>
+      <section class="cx-hero">
+        <div class="cx-bg">${cityScene(c, true)}${photoOver(cityWiki(c))}</div><div class="cx-shade"></div>
+        <div class="wrap cx-hero-in">
+          <nav class="cx-crumb" aria-label="${T("المسار", "Breadcrumb")}"><a href="#/${D.continent}">${T("آسيا", "Asia")}</a><i>›</i><a href="${B()}">${D.flag} ${esc(D.name)}</a><i>›</i><span>${esc(c.short || c.name)}</span></nav>
+          <h1>${esc(c.name)}</h1>
+          <p class="cx-lead">${esc(c.summary)}</p>
+          <div class="cx-stats">
+            <div><b>★ ${avg.toFixed(1)}</b><small>${T("تقييم الأماكن", "Avg. rating")}</small></div>
+            <div><b>${ps.length}</b><small>${T("مكان للزيارة", "places to see")}</small></div>
+            <div><b>${dayWord(c.days.ideal)}</b><small>${T("المدة المقترحة", "suggested stay")}</small></div>
+            <div><b>${money(c.costs.hotel.eco)}</b><small>${T("الليلة من", "per night from")}</small></div>
+          </div>
+          <div class="cx-actions"><a class="cx-btn p" href="${B()}/build">🧭 ${T("خطط رحلة هنا", "Plan a trip here")}</a>${window.MAPS && window.MAPS[D.id] ? `<a class="cx-btn g" href="${B()}/map">🗺️ ${T("على الخريطة", "On the map")}</a>` : ""}</div>
         </div>
+      </section>
+      <div class="cx-sheet">
+        <nav class="cx-tabs" id="cxTabs"><div class="wrap">
+          ${[["over", T("نظرة سريعة", "Overview")], ["places", T("الأماكن", "Places")], ["costs", T("التكاليف", "Costs")], ["stay", T("وين تسكن", "Where to stay")], ["halal", T("الحلال", "Halal")], ["move", T("التنقل", "Getting around")]].map(([k, l], i) => `<a href="#cx-${k}" data-tab="${k}" class="${i ? "" : "on"}">${l}</a>`).join("")}
+        </div></nav>
+        <div class="wrap cx-grid">
+          <div class="cx-main">
+            <section class="cx-sec" id="cx-over">
+              <h2>${T("نظرة سريعة", "At a glance")}</h2>
+              <div class="cx-traits">${Object.keys(D.interests).map((k) => `<div class="cx-tr"><span>${TR[k] || ICONS[k]} ${esc(D.interests[k])}</span><span class="cx-bar">${[1, 2, 3].map((n) => `<i class="${(c.interests[k] || 0) >= n ? "on" : ""}"></i>`).join("")}</span></div>`).join("")}</div>
+              <div class="cx-duo">
+                <div class="cx-box"><small>🌤️ ${T("أفضل وقت للزيارة", "Best time to visit")}</small><p>${esc(c.bestTime)}</p></div>
+                <div class="cx-box"><small>👥 ${T("مناسبة لـ", "Great for")}</small><div class="cx-chips">${who.map((w) => `<span>${w}</span>`).join("")}</div></div>
+              </div>
+            </section>
 
-        <aside class="facts">
-          <dl>
-            <div><dt>${T("أفضل وقت", "Best time")}</dt><dd>${esc(c.bestTime)}</dd></div>
-            <div><dt>${T("المدة المقترحة", "Suggested stay")}</dt><dd>${dayWord(c.days.ideal)}</dd></div>
-            <div><dt>${T("السكن لليلة", "Hotels per night")}</dt><dd>${T(`من ${money(c.costs.hotel.eco)} إلى ${money(c.costs.hotel.lux)}`, `${money(c.costs.hotel.eco)} – ${money(c.costs.hotel.lux)}`)}</dd></div>
-            <div><dt>${T("أقرب مطار", "Nearest airport")}</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].name)} (${hoursText(c.hubKm / 45)} ${T("بالطريق", "by road")})`}</dd></div>
-          </dl>
-          <div class="facts-book">🛏️ ${T("أسعار السكن الحقيقية الحين:", "Live lodging prices:")} ${(() => { const gp = getPlan(); return bookingLinks(c, gp.travelers, gp.startDate, gp.endDate) + (gp.startDate && gp.endDate ? `<small>${T("بتواريخ رحلتك", "for your dates")}: ${niceDate(gp.startDate)} – ${niceDate(gp.endDate)}</small>` : ""); })()}</div>
-          <a class="btn no-print" href="${B()}/plan">${T("كم تكفيني ميزانيتي؟", "What will my budget cover?")}</a>
-        </aside>
+            <section class="cx-sec" id="cx-places">
+              <div class="cx-h"><h2>${T("وش تزور؟", "What to see")} <small>${ps.length} ${T("مكان", "places")}</small></h2><a class="cx-more" href="${B()}/places">${T("كل أماكن", "All places in")} ${esc(D.name)} ›</a></div>
+              <h3 class="cx-sub">⭐ ${T("لا تفوّتها", "Don't miss")}</h3>
+              <div class="cx-top">${tops.map((p) => card(p, true)).join("")}</div>
+              ${rest.length ? `
+              <div class="cx-filter" role="tablist">${["all", ...types].map((t, i) => `<button type="button" class="${i ? "" : "on"}" data-f="${t}">${t === "all" ? T("الكل", "All") : `${ICONS[t]} ${esc(D.interests[t])}`}</button>`).join("")}</div>
+              <div class="cx-pgrid" id="cxGrid">${rest.map((p) => card(p)).join("")}</div>` : ""}
+            </section>
+
+            <section class="cx-sec" id="cx-costs">
+              <div class="cx-h"><h2>${T("كم تكلف؟", "What it costs")}</h2>
+                <div class="cx-seg" role="radiogroup">${TIERS.map((t) => `<button type="button" data-tier="${t}" class="${t === "mid" ? "on" : ""}">${D.tiers[t].name}</button>`).join("")}</div></div>
+              <div class="cx-costs" data-tier="mid">
+                ${costRow("🏨", T("فندق", "Hotel"), T("لليلة، غرفة لشخصين", "per night, room for two"), c.costs.hotel)}
+                ${costRow("🏠", T("شقة Airbnb كاملة", "Whole Airbnb flat"), T("لليلة، تكفي 4 · تقدير", "per night, sleeps 4 · est."), apt)}
+                ${costRow("🛏️", T("غرفة خاصة في Airbnb", "Private Airbnb room"), T("لليلة · تقدير", "per night · est."), room)}
+                ${costRow("🍽️", T("الأكل", "Food"), T("للشخص في اليوم", "per person per day"), c.costs.food)}
+                ${costRow("🚕", T("التنقل داخل المدينة", "Getting around"), T("للشخص في اليوم", "per person per day"), c.costs.transport)}
+                <div class="cx-day">${TIERS.map((t) => `<div data-t="${t}"><span>${T("يوم نموذجي للشخص (سكن مشترك + أكل + تنقل)", "A typical day per person (shared room + food + transport)")}</span><b>${money(dayTot[t])}</b></div>`).join("")}</div>
+              </div>
+              <p class="cx-note">${c.costs.note ? esc(c.costs.note) + " " : ""}${D.tiers.mid.desc ? "" : ""}</p>
+              ${src(c.costs.src, c.costs.date, "numbeo")}
+            </section>
+
+            <section class="cx-sec" id="cx-stay">
+              <h2>${T("وين تسكن؟", "Where to stay")}</h2>
+              <div class="cx-areas">${c.stayAreas.map((a, i) => `<div class="cx-area"><span class="cx-n">${i + 1}</span><div><b>${esc(a.name)}</b><p>${esc(a.desc)}</p></div></div>`).join("")}</div>
+            </section>
+
+            <section class="cx-sec" id="cx-halal">
+              <h2>${T("الأكل الحلال والمساجد", "Halal food & mosques")}</h2>
+              <div class="cx-box cx-halal"><p>🍽️ ${esc(c.halal.food)}</p>
+                ${c.halal.mosques.length ? `<ul>${c.halal.mosques.map((m) => `<li><span>🕌</span><div><b>${esc(m.name)}</b><small>${esc(m.note)}</small></div></li>`).join("")}</ul>` : `<p class="cx-muted">${T("ما فيه مساجد معروفة قريبة من مناطق السياح.", "No well-known mosques near the tourist areas.")}</p>`}
+                ${src(c.halal.src, c.halal.date)}</div>
+            </section>
+
+            <section class="cx-sec" id="cx-move">
+              <h2>${T("التنقل", "Getting around")}</h2>
+              <ul class="cx-move">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+              <h3 class="cx-sub">${T(`أقرب الوجهات من ${esc(c.short || c.name)}`, `Nearest stops from ${esc(c.short || c.name)}`)}</h3>
+              <div class="cx-near">${near.map(({ o, t }) => `<a href="${B()}/city/${o.id}" class="cx-nc"><span class="cx-nph">${cityScene(o, true)}</span><span><b>${esc(o.short || o.name)}</b><small>${t.flight ? "✈️" : "🚐"} ${hoursText(t.hours)} · ${T("من", "from")} ${money(t.cost.eco)}</small></span></a>`).join("")}</div>
+              <p class="cx-note">${T("المدد والأسعار تقديرية محسوبة من المسافة.", "Times and prices are estimates based on distance.")}</p>
+            </section>
+          </div>
+
+          <aside class="cx-side">
+            <div class="cx-book">
+              <small>${T("السكن في", "Stays in")} ${esc(c.short || c.name)}</small>
+              <div class="cx-from"><b>${money(c.costs.hotel.eco)}</b> <span>– ${money(c.costs.hotel.lux)} ${T("لليلة", "a night")}</span></div>
+              ${gp.startDate && gp.endDate ? `<div class="cx-dates">📅 ${niceDate(gp.startDate)} – ${niceDate(gp.endDate)}${nights > 0 ? ` · ${nights} ${T("ليالي", "nights")}` : ""}</div>` : `<div class="cx-dates">📅 <a href="${B()}/plan">${T("حدد تواريخ رحلتك", "Set your travel dates")}</a></div>`}
+              <div class="cx-bl">${bookingLinks(c, gp.travelers, gp.startDate, gp.endDate)}</div>
+              <a class="cx-btn p wide" href="${B()}/plan">${T("كم تكفيني ميزانيتي؟", "What will my budget cover?")}</a>
+              <dl>
+                <div><dt>✈️ ${T("أقرب مطار", "Nearest airport")}</dt><dd>${c.code ? `<span dir="ltr">${esc(c.code)}</span>` : `${esc(cityById[c.hub].short || cityById[c.hub].name)} (${hoursText(c.hubKm / 45)})`}</dd></div>
+                <div><dt>🗺️ ${T("المنطقة", "Region")}</dt><dd>${esc(c.region)}</dd></div>
+              </dl>
+            </div>
+          </aside>
+        </div>
       </div>`;
+
+    // التبويبات: تمرير ناعم وتحديد القسم الحالي
+    const tabs = document.getElementById("cxTabs");
+    tabs.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-tab]"); if (!a) return;
+      e.preventDefault();
+      const sec = document.getElementById("cx-" + a.dataset.tab);
+      window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - (tabs.offsetHeight + (window.innerWidth > 560 ? 90 : 70)), behavior: reduced ? "auto" : "smooth" });
+    });
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((ents) => ents.forEach((en) => { if (en.isIntersecting) { const k = en.target.id.slice(3); tabs.querySelectorAll("a").forEach((x) => x.classList.toggle("on", x.dataset.tab === k)); const on = tabs.querySelector(".on"); if (on) on.scrollIntoView({ block: "nearest", inline: "center" }); } }), { rootMargin: "-40% 0px -55% 0px" });
+      app.querySelectorAll(".cx-sec").forEach((x) => io.observe(x));
+    }
+    // فلتر الأماكن
+    const grid = document.getElementById("cxGrid");
+    app.querySelector(".cx-filter")?.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-f]"); if (!b) return;
+      app.querySelectorAll(".cx-filter button").forEach((x) => x.classList.toggle("on", x === b));
+      grid.querySelectorAll(".cx-pc").forEach((x) => { x.hidden = b.dataset.f !== "all" && x.dataset.type !== b.dataset.f; });
+    });
+    // مستوى التكاليف
+    app.querySelector(".cx-seg").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-tier]"); if (!b) return;
+      app.querySelectorAll(".cx-seg button").forEach((x) => x.classList.toggle("on", x === b));
+      app.querySelector(".cx-costs").dataset.tier = b.dataset.tier;
+    });
     loadPhotos(app);
   }
 
@@ -1498,7 +1560,25 @@
   function viewMap(cityId) {
     const M = window.MAPS && window.MAPS[D.id];
     if (!M) return viewNotFound();
-    const CM = cityId && M.cities[cityId];
+    // حدود الدول ملف كبير، فنحمّله بس لما تنفتح الخريطة
+    if (!window.GEO) {
+      app.innerHTML = `<div class="mapview"><div class="mv-loading">🗺️ ${T("نجهّز الخريطة…", "Loading the map…")}</div></div>`;
+      const want = location.hash;
+      const sc = document.createElement("script");
+      sc.src = "data/geo.js";
+      sc.onload = () => { if (location.hash === want) viewMap(cityId); };
+      sc.onerror = () => { app.innerHTML = `<div class="wrap empty-state">${T("ما قدرنا نحمّل الخريطة. تأكد من الاتصال وحاول مرة ثانية.", "Couldn't load the map. Check your connection and try again.")}</div>`; };
+      document.head.appendChild(sc);
+      return;
+    }
+    const G = window.GEO[D.id];
+    if (!G) return viewNotFound();
+    const [lo0, la0, lo1, la1] = G.bbox, kx = Math.cos(((la0 + la1) / 2) * Math.PI / 180);
+    const U = 420 / Math.max((lo1 - lo0) * kx, la1 - la0);
+    const proj = (lat, lon) => [(lon - lo0) * kx * U, (la1 - lat) * U];
+    const ringD = (r) => smoothPath(r.map(([lon, lat]) => proj(lat, lon)));
+    const cities = M.cities || {};
+    const CM = cityId && cities[cityId];
     if (cityId && !CM) return viewNotFound();
     const st = { layer: "hotel", tier: "mid", stay: "hotel", ...store.get("mapState", {}) };
     const save = () => store.set("mapState", st);
@@ -1515,10 +1595,16 @@
     const legendTitle = () => (st.layer === "hotel" ? T("سعر الليلة", "Price per night") : st.layer === "food" ? T("الأكل للشخص باليوم", "Food per person per day") : st.layer === "transport" ? T("التنقل للشخص باليوم", "Transport per person per day") : T("الإجمالي للشخص باليوم", "Total per person per day"));
 
     // النقاط
-    let items, bounds;
+    let items, bounds, fitB = null;
     if (!CM) {
-      items = D.cities.map((c) => { const [x, y] = M.project(c.lat, c.lon); return { id: c.id, c, x, y, name: c.short || c.name, main: c.id === M.capital }; });
-      bounds = [-30, -15, 240, 405];
+      items = D.cities.map((c) => { const [x, y] = proj(c.lat, c.lon); return { id: c.id, c, x, y, name: c.short || c.name, main: c.id === (M.main || M.capital) }; });
+      bounds = [0, 0, (lo1 - lo0) * kx * U, (la1 - la0) * U];
+      // الكاميرا تبدأ على المدن نفسها (مو على جزر بعيدة)، مع هامش يبين شكل الدولة حولها
+      const xs = items.map((i) => i.x), ys = items.map((i) => i.y);
+      let fx0 = Math.min(...xs), fx1 = Math.max(...xs), fy0 = Math.min(...ys), fy1 = Math.max(...ys);
+      const mw = Math.max(bounds[2] * 0.45, (fx1 - fx0) * 1.35, 60), mh = Math.max(bounds[3] * 0.45, (fy1 - fy0) * 1.35, 60);
+      const cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
+      fitB = [cx - mw / 2, cy - mh / 2, Math.min(mw, bounds[2] * 1.1), Math.min(mh, bounds[3] * 1.1)];
     } else {
       items = CM.districts.map((d) => ({ id: d.id, d, x: d.x, y: d.y, name: L(d.name), main: !!d.main }));
       bounds = window.innerWidth > 860 ? [-460, -330, 920, 700] : [-380, -230, 760, 430];
@@ -1538,12 +1624,24 @@
     const W0 = { x: bounds[0] - PAD, y: bounds[1] - PAD, w: bounds[2] + PAD * 2, h: bounds[3] + PAD * 2 };
     let art = "";
     if (!CM) {
-      const land = smoothPath(M.outline);
-      art = `${[...Array(10)].map((_, i) => `<path d="M${W0.x},${W0.y + i * 60} C${W0.x + 120},${W0.y + i * 60 - 15} ${W0.x + 260},${W0.y + i * 60 + 20} ${W0.x + W0.w},${W0.y + i * 60}" stroke="#fff" stroke-opacity=".22" fill="none" stroke-width=".8"/>`).join("")}
-        <path d="${land}" fill="#0f3d3e" opacity=".12" transform="translate(2 5)"/>
+      const land = G.rings.map(ringD).join(" ");
+      // التضاريس: ظل الجبال وقممها، والأنهار والبحيرات
+      const peak = (x, y, s, snow) => `<path d="M${x - s},${y} L${x},${y - s * 1.3} L${x + s},${y}Z" fill="#c9b38a"/><path d="M${x},${y - s * 1.3} L${x + s},${y} L${x + s * 0.12},${y}Z" fill="#a8916a"/>${snow ? `<path d="M${x - s * 0.34},${y - s * 0.86} L${x},${y - s * 1.3} L${x + s * 0.34},${y - s * 0.86} L${x + s * 0.1},${y - s * 0.96} L${x - s * 0.08},${y - s * 0.82}Z" fill="#fff"/>` : ""}`;
+      const mts = (M.mt || []).map(([lat, lon, sz, snow]) => { const [x, y] = proj(lat, lon), s = 3 + sz * 1.7; return { x, y, s, snow }; });
+      const shade = mts.map(({ x, y, s }) => `<ellipse cx="${x}" cy="${y - s * 0.4}" rx="${s * 3.4}" ry="${s * 1.9}" fill="url(#mvHill)"/>`).join("");
+      const peaks = mts.map(({ x, y, s, snow }) => peak(x - s * 1.05, y + s * 0.3, s * 0.72, snow) + peak(x + s * 1.0, y + s * 0.35, s * 0.66, snow) + peak(x, y, s, snow)).join("");
+      const rivers = (M.rivers || []).map((r) => { const d = smoothPath(r.map(([lat, lon]) => proj(lat, lon)), false); return `<path d="${d}" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".7"/><path d="${d}" stroke="#6fb3c4" stroke-width="1.6" fill="none" stroke-linecap="round"/>`; }).join("");
+      const lakes = (M.lakes || []).map(([lat, lon, rx, ry]) => { const [x, y] = proj(lat, lon); return `<ellipse cx="${x}" cy="${y}" rx="${Math.max(2.5, rx * kx * U)}" ry="${Math.max(2, ry * U)}" fill="#9fcfd0" stroke="#fff" stroke-width=".8"/>`; }).join("");
+      const labels = (M.labels || []).map(([lat, lon, ar, en]) => { const [x, y] = proj(lat, lon); return `<text x="${x}" y="${y}" text-anchor="middle" font-size="10" font-style="italic" fill="#3f7f86" opacity=".85" letter-spacing=".5">${EN_ON ? en : ar}</text>`; }).join("");
+      const ctxLand = (G.ctx || []).map((r) => `<path d="${smoothPath(r.map(([lon, lat]) => proj(lat, lon)))}"/>`).join("");
+      art = `${[...Array(14)].map((_, i) => `<path d="M${W0.x},${W0.y + i * 48} C${W0.x + W0.w * 0.3},${W0.y + i * 48 - 14} ${W0.x + W0.w * 0.6},${W0.y + i * 48 + 18} ${W0.x + W0.w},${W0.y + i * 48}" stroke="#fff" stroke-opacity=".2" fill="none" stroke-width=".7"/>`).join("")}
+        <g fill="#e6dfcd" stroke="#fff" stroke-width=".8" opacity=".75">${ctxLand}</g>
+        <path d="${land}" fill="#0f3d3e" opacity=".14" transform="translate(1.5 4)"/>
         <path d="${land}" fill="#f4ecdc"/>
-        <g clip-path="url(#mvClip)" id="mvHeat"></g>
-        <path d="${land}" fill="none" stroke="#fff" stroke-width="2"/><path d="${land}" fill="none" stroke="#12312f" stroke-opacity=".22" stroke-width=".7"/>`;
+        <g clip-path="url(#mvClip)">${shade}<g id="mvHeat"></g></g>
+        ${lakes}${rivers}
+        <path d="${land}" fill="none" stroke="#fff" stroke-width="2"/><path d="${land}" fill="none" stroke="#12312f" stroke-opacity=".25" stroke-width=".7"/>
+        <g opacity=".95">${peaks}</g>${labels}`;
     } else {
       let streets = "";
       for (let i = -9; i <= 9; i++) {
@@ -1568,7 +1666,7 @@
       <div class="mapview ${CM ? "is-city" : ""}" id="mv">
         <div class="mv-stage" id="mvStage">
           <div class="mv-world" id="mvWorld"><svg id="msvg" viewBox="${W0.x} ${W0.y} ${W0.w} ${W0.h}" role="img" aria-label="${T("خريطة الأسعار", "Price map")}">
-            <defs>${!CM ? `<clipPath id="mvClip"><path d="${smoothPath(M.outline)}"/></clipPath>` : ""}<g id="mvGrads"></g></defs>
+            <defs>${!CM ? `<clipPath id="mvClip"><path d="${G.rings.map(ringD).join(" ")}"/></clipPath><radialGradient id="mvHill"><stop offset="0" stop-color="#8a7350" stop-opacity=".32"/><stop offset="1" stop-color="#8a7350" stop-opacity="0"/></radialGradient>` : ""}<g id="mvGrads"></g></defs>
             ${art}
           </svg></div>
           <div class="mv-pins" id="mvPins"></div>
@@ -1594,7 +1692,7 @@
       document.getElementById("mvLegend").innerHTML = `<b>${legendTitle()}</b><div class="mv-bar"></div><div class="mv-ends"><span>${T("أرخص", "Cheaper")} · ${money(vmin)}</span><span>${T("أغلى", "Pricier")} · ${money(vmax)}</span></div><small>${T("أسعار تقديرية", "Estimated prices")}${CM ? T(" · مواقع الأحياء تقريبية", " · approximate neighbourhood layout") : ""}</small>`;
       // التدرج الحراري بتدرجات شعاعية بدل فلتر الضباب (أخف بكثير)
       grads.innerHTML = items.map((i) => `<radialGradient id="hg-${i.id}"><stop offset="0" stop-color="${heatCol(norm(i.v))}" stop-opacity=".85"/><stop offset=".55" stop-color="${heatCol(norm(i.v))}" stop-opacity=".45"/><stop offset="1" stop-color="${heatCol(norm(i.v))}" stop-opacity="0"/></radialGradient>`).join("");
-      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${CM ? (i.main ? 190 : 165) : i.main ? 52 : 42}" fill="url(#hg-${i.id})"/>`).join("");
+      heat.innerHTML = items.map((i) => `<circle cx="${i.x}" cy="${i.y}" r="${CM ? (i.main ? 190 : 165) : i.main ? 46 : 38}" fill="url(#hg-${i.id})"/>`).join("");
       pinsL.innerHTML = items.map((i) => `<button type="button" class="mv-pin ${i.id === sel ? "sel" : ""}" data-id="${i.id}" aria-label="${esc(i.name)} ${money(i.v)}"><span class="pdot" style="background:${heatCol(norm(i.v))}"></span><span class="pin-in"><span class="pb"><i style="background:${heatCol(norm(i.v))}"></i>${money(i.v)}</span><span class="pn">${esc(i.name)}</span></span></button>`).join("");
       pinEls = [...pinsL.children].map((el) => ({ el, it: items.find((x) => x.id === el.dataset.id), w: 0 }));
       pinEls.forEach((p) => { p.w = p.el.querySelector(".pb").offsetWidth || 90; });
@@ -1612,8 +1710,9 @@
     const S = () => base * cam.k;
     const toScreen = (x, y) => [(x - W0.x) * S() + cam.tx, (y - W0.y) * S() + cam.ty];
     const toWorld = (sx, sy) => [(sx - cam.tx) / S() + W0.x, (sy - cam.ty) / S() + W0.y];
+    const FB = () => fitB || bounds;
     const fitCam = () => {
-      const u = usable();
+      const u = usable(), bounds = FB();
       const sc = Math.min(u.w / bounds[2], u.h / bounds[3]);
       // نرسم العالم بدقة أعلى من الشاشة عشان يبقى حاد مع التكبير
       base = Math.min(6, Math.max(1, sc * 1.6));
@@ -1622,7 +1721,7 @@
       cam.tx = u.x + (u.w - bounds[2] * sc) / 2 - (bounds[0] - W0.x) * sc;
       cam.ty = u.y + (u.h - bounds[3] * sc) / 2 - (bounds[1] - W0.y) * sc;
     };
-    const kMin = () => (usable().w / bounds[2]) / base * 0.5, kMax = () => (usable().w / bounds[2]) / base * 6;
+    const kMin = () => Math.min(usable().w / bounds[2], usable().h / bounds[3]) / base * 0.8, kMax = () => (usable().w / FB()[2]) / base * 6;
     const clampK = (k) => Math.max(kMin(), Math.min(kMax(), k));
     const draw = () => {
       raf = 0;
@@ -1720,15 +1819,26 @@
       const diffTxt = diff < -3 ? T(`<b>أرخص ${-diff}%</b> من المتوسط`, `<b>${-diff}% cheaper</b> than average`) : diff > 3 ? T(`<b>أغلى ${diff}%</b> من المتوسط`, `<b>${diff}% pricier</b> than average`) : T("<b>قريب من المتوسط</b>", "<b>About average</b>");
       if (!CM) {
         const c = it.c;
-        const canZoom = !!M.cities[c.id];
+        const canZoom = !!cities[c.id];
         const curve = seasonCurve(c).map((x) => value(c) * x);
         const cheapM = MONTHS[curve.indexOf(Math.min(...curve))];
+        const ix = items.findIndex((i) => i.id === sel);
+        const tags = Object.entries(c.interests).filter(([, v]) => v >= 2).sort((a, b) => b[1] - a[1]).map(([k]) => `<span class="mv-tag">${ICONS[k]} ${esc(D.interests[k])}</span>`).join("");
+        const who = [c.interests.fun >= 2 || c.interests.beach >= 2 ? T("👨‍👩‍👧 العوائل", "👨‍👩‍👧 Families") : "", c.interests.beach >= 2 || c.interests.nature >= 3 ? T("💑 الأزواج", "💑 Couples") : "", c.interests.nature >= 3 ? T("🥾 محبي المغامرة", "🥾 Adventurers") : "", c.interests.history >= 3 ? T("🏛️ محبي التاريخ", "🏛️ History lovers") : "", c.interests.food >= 2 ? T("🍜 محبي الأكل", "🍜 Foodies") : ""].filter(Boolean).slice(0, 3);
+        const tops = allPlaces.filter((p) => p.city === c).sort((a, b) => b.rating - a.rating).slice(0, 3);
         sheet.innerHTML = `
-          <div class="mv-grab"></div>
-          <div class="mv-art">${cityScene(c, true)}${photoOver(cityWiki(c))}${c.id === M.capital ? `<span class="mv-badge">📍 ${T("العاصمة", "Capital")}</span>` : ""}</div>
+          <div class="mv-grab" role="button" aria-label="${T("كبّر البطاقة", "Expand")}"></div>
+          <div class="mv-strip" role="tablist">${items.map((i) => `<button type="button" role="tab" class="mv-sc ${i.id === sel ? "on" : ""}" data-sel="${i.id}" aria-selected="${i.id === sel}"><i style="background:${heatCol(norm(i.v))}"></i>${esc(i.name)}</button>`).join("")}</div>
+          <div class="mv-art">${cityScene(c, true)}${photoOver(cityWiki(c))}${c.id === M.capital ? `<span class="mv-badge">📍 ${T("العاصمة", "Capital")}</span>` : ""}
+            <button type="button" class="mv-nav prev" data-sel="${items[(ix - 1 + items.length) % items.length].id}" aria-label="${T("المدينة السابقة", "Previous city")}">${T("›", "‹")}</button><button type="button" class="mv-nav next" data-sel="${items[(ix + 1) % items.length].id}" aria-label="${T("المدينة التالية", "Next city")}">${T("‹", "›")}</button></div>
           <div class="mv-body">
-            <div><h2>${esc(c.name)}</h2><div class="mv-sub">${esc(c.region)} · ${c.places.length} ${T("مكان", "places")} · ${dayWord(c.days.ideal)}</div></div>
+            <div><h2>${esc(c.name)}</h2><div class="mv-sub">${esc(c.region)} · ${c.places.length} ${T("مكان", "places")} · ${T("المدة المقترحة", "suggested")} ${dayWord(c.days.ideal)}</div></div>
+            <p class="mv-sum">${esc(c.summary)}</p>
+            ${tags ? `<div class="mv-tags">${tags}</div>` : ""}
+            ${who.length ? `<div class="mv-who"><small>${T("مناسبة لـ", "Great for")}</small>${who.map((w) => `<span>${w}</span>`).join("")}</div>` : ""}
             <div class="mv-kpis"><div><small>🏨 ${T("الليلة", "Night")}</small><b>${money(c.costs.hotel[st.tier])}</b></div><div><small>🍽️ ${T("اليوم", "Day")}</small><b>${money(c.costs.food[st.tier])}</b></div><div><small>🚕 ${T("اليوم", "Day")}</small><b>${money(c.costs.transport[st.tier])}</b></div></div>
+            ${tops.length ? `<div class="mv-tops"><small>⭐ ${T("أبرز الأماكن", "Top sights")}</small>${tops.map((p) => `<button type="button" class="mv-top-p" data-place="${p.key}">${photoBox(p)}<span><b>${esc(p.name)}</b><em>★ ${p.rating.toFixed(1)} · ${p.fee ? money(p.fee) : T("مجانًا", "Free")}</em></span></button>`).join("")}</div>` : ""}
+            <div class="mv-best">🌤️ <span><small>${T("أفضل وقت", "Best time")}</small>${esc(c.bestTime)}</span></div>
             <div class="mv-spark"><small>${T(`السعر خلال السنة (تقديري) · الأرخص في ${cheapM}`, `Price through the year (est.) · cheapest in ${cheapM}`)}</small>${sparkSVG(curve)}</div>
             <div class="mv-tip">💡 ${diffTxt} ${T("في", "in")} ${esc(D.name)}.</div>
             <div class="mv-cta">${canZoom ? `<a class="p" href="${B()}/map/${c.id}">🔍 ${T("قرّب على", "Zoom into")} ${esc(c.short || c.name)}</a>` : `<a class="p" href="${B()}/city/${c.id}">${T("صفحة الوجهة", "Destination page")}</a>`}<a class="s" href="${B()}/plan">${T("خطط رحلة", "Plan a trip")}</a></div>
@@ -1753,12 +1863,26 @@
           </div>`;
       }
       loadPhotos(sheet);
+      const strip = sheet.querySelector(".mv-strip"), on = strip && strip.querySelector(".on");
+      if (on) strip.scrollLeft += on.getBoundingClientRect().left - strip.getBoundingClientRect().left - (strip.clientWidth - on.offsetWidth) / 2;
+    };
+    // اختيار مدينة: نقرّب عليها ونخليها في نص الجزء الظاهر من الخريطة
+    const selectCity = (id) => {
+      sel = id; store.set("mapSel:" + (cityId || D.id), sel); paint();
+      const it = items.find((i) => i.id === sel), u = usable();
+      const fitK = Math.min(u.w / FB()[2], u.h / FB()[3]) / base;
+      const k2 = clampK(Math.max(cam.k, fitK * (CM ? 1.25 : 2)));
+      const S2 = base * k2;
+      flyTo({ k: k2, tx: u.x + u.w / 2 - (it.x - W0.x) * S2, ty: u.y + u.h / 2 - (it.y - W0.y) * S2 }, 450);
     };
     pinsL.addEventListener("click", (e) => {
       const b = e.target.closest(".mv-pin"); if (!b || moved) return;
-      sel = b.dataset.id; store.set("mapSel:" + (cityId || D.id), sel); paint();
-      const it = items.find((i) => i.id === sel), u = usable(), [x, y] = toScreen(it.x, it.y);
-      if (x < u.x || x > u.x + u.w || y < u.y || y > u.y + u.h) flyTo({ ...cam, tx: cam.tx + (u.x + u.w / 2 - x), ty: cam.ty + (u.y + u.h / 2 - y) });
+      selectCity(b.dataset.id);
+    });
+    sheet.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sel]");
+      if (b) { selectCity(b.dataset.sel); return; }
+      if (e.target.closest(".mv-grab")) sheet.classList.toggle("full");
     });
     document.getElementById("mvChips").addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
