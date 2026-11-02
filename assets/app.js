@@ -346,7 +346,7 @@
         </div>
       </section>`;
   }
-  const selectOpts = (arr, cur, word) => arr.map((d) => `<option ${d === cur ? "selected" : ""} value="${d}">${word(d)}</option>`).join("");
+  const selectOpts = (arr, cur, word) => (cur && !arr.includes(cur) ? [...arr, cur].sort((x, y) => x - y) : arr).map((d) => `<option ${d === cur ? "selected" : ""} value="${d}">${word(d)}</option>`).join("");
   function ticketForm(id, { amount, unit, days, travelers, go, mode }) {
     return `
       <form class="ticket" id="${id}">
@@ -364,56 +364,102 @@
     const st = getPlan();
     const ready = Object.values(W.countries);
     const sar = (v) => (EN_ON ? "SAR " + fmt(v) : fmt(v) + " ريال");
-    // أرخص يوم للشخص في كل دولة (سكن مشترك اقتصادي + أكل + تنقل)
     const info = ready.map((C) => {
       const day = Math.min(...C.cities.map((c) => (c.costs.hotel.eco / 2 + c.costs.food.eco + c.costs.transport.eco) / C.currency.perSAR));
       const has = (k) => C.cities.some((c) => (c.interests[k] || 0) >= 2);
-      return { C, day: Math.max(10, Math.round(day / 5) * 5), free: !C.visaSAR, beach: has("beach"), nature: C.cities.some((c) => (c.interests.nature || 0) >= 3), places: C.cities.reduce((a, c) => a + c.places.length, 0) };
+      const M = window.MAPS && window.MAPS[C.id];
+      const cap = C.cities.find((c) => M && c.id === M.capital) || C.cities.find((c) => c.code) || C.cities[0];
+      return { C, cap, day: Math.max(10, Math.round(day / 5) * 5), free: !C.visaSAR, beach: has("beach"), nature: C.cities.some((c) => (c.interests.nature || 0) >= 3), places: C.cities.reduce((a, c) => a + c.places.length, 0) };
     }).sort((x, y) => x.day - y.day);
-    const FILTERS = [["all", T("الكل", "All")], ["cheap", T("💸 الأرخص", "💸 Cheapest")], ["free", T("🛂 بدون تأشيرة", "🛂 Visa-free")], ["beach", T("🏖️ بحر", "🏖️ Beaches")], ["nature", T("🏔️ جبال وطبيعة", "🏔️ Mountains & nature")]];
-    const ccard = ({ C, day, free, beach, nature, places }, i) => `
-      <a class="hx-cc" href="#/c/${C.id}" data-free="${free ? 1 : 0}" data-beach="${beach ? 1 : 0}" data-nature="${nature ? 1 : 0}" data-cheap="${i < 8 ? 1 : 0}">
-        <span class="hx-art">${scene(C.scene, true)}${photoOver(cityWiki(C.cities[0]))}<span class="hx-flag">${C.flag}</span>${free ? `<span class="hx-free">${T("بدون تأشيرة", "Visa-free")}</span>` : ""}</span>
-        <span class="hx-cb"><b>${esc(C.name)}</b><small>${esc(C.tagline)}</small>
-          <span class="hx-cm"><em>${T("يومك من", "From")} <strong>${sar(day)}</strong>${T("", " / day")}</em><span>${C.cities.length} ${T("مدن", "cities")} · ${places} ${T("مكان", "places")}</span></span></span>
+    const totalPlaces = info.reduce((a, x) => a + x.places, 0), totalCities = ready.reduce((a, C) => a + C.cities.length, 0);
+
+    // خريطة الأطلس: آسيا بحدود حقيقية ومسارات من الرياض
+    const A = window.ATLAS_ASIA;
+    const PJ = (lat, lon) => [A.proj.ox + (lon - A.proj.L0) * A.proj.kx * A.proj.sc, A.proj.oy + (A.proj.B1 - lat) * A.proj.sc];
+    const R = PJ(24.71, 46.68);
+    let atlasMap = "";
+    if (A) {
+      let grat = "";
+      for (let lo = 30; lo <= 140; lo += 10) { const [x1, y1] = PJ(56, lo), [x2, y2] = PJ(-11, lo); grat += `M${x1.toFixed(0)} ${y1.toFixed(0)}L${x2.toFixed(0)} ${y2.toFixed(0)}`; }
+      for (let la = -10; la <= 50; la += 10) { const [x1, y1] = PJ(la, 24), [x2, y2] = PJ(la, 146); grat += `M${x1.toFixed(0)} ${y1.toFixed(0)}L${x2.toFixed(0)} ${y2.toFixed(0)}`; }
+      const show = new Set([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+      const pins = info.map((x, i) => {
+        const [px, py] = PJ(x.cap.lat, x.cap.lon), mx = (R[0] + px) / 2, my = (R[1] + py) / 2 - Math.hypot(px - R[0], py - R[1]) * 0.22;
+        return { x, i, px, py, arc: `<path class="at-route aa-arc" style="--d:${(i * 0.08).toFixed(2)}s" d="M${R[0].toFixed(0)} ${R[1].toFixed(0)}Q${mx.toFixed(0)} ${my.toFixed(0)} ${px.toFixed(0)} ${py.toFixed(0)}"/>` };
+      });
+      atlasMap = `<svg class="aa-map" viewBox="0 0 ${A.w} ${A.h}" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${T("خريطة آسيا", "Map of Asia")}">
+        <rect width="${A.w}" height="${A.h}" fill="#cfe0d8"/><path d="${grat}" fill="none" stroke="#2c5d63" stroke-opacity=".12" stroke-width=".8"/>
+        <path d="${A.land}" fill="#e7dcc1" stroke="#b9a27a" stroke-width=".7"/>
+        ${info.map((x) => A.ctry[x.C.id] ? `<a href="#/c/${x.C.id}" class="aa-c" aria-label="${esc(x.C.name)}"><path d="${A.ctry[x.C.id]}"/><title>${esc(x.C.name)} · ${T("يومك من", "from")} ${sar(x.day)}</title></a>` : "").join("")}
+        <text x="${PJ(14.5, 88)[0]}" y="${PJ(14.5, 88)[1]}" class="aa-sea">${T("خليج البنغال", "Bay of Bengal")}</text>
+        <text x="${PJ(4, 70)[0]}" y="${PJ(4, 70)[1]}" class="aa-sea big">${T("المحيط الهندي", "Indian Ocean")}</text>
+        <text x="${PJ(14, 116)[0]}" y="${PJ(14, 116)[1]}" class="aa-sea">${T("بحر الصين الجنوبي", "South China Sea")}</text>
+        ${pins.map((p) => p.arc).join("")}
+        <circle cx="${R[0]}" cy="${R[1]}" r="7" fill="#b4512f" stroke="#faf5e9" stroke-width="2.5"/><text x="${R[0]}" y="${R[1] + 22}" class="aa-lbl home">${T("الرياض", "Riyadh")}</text>
+        ${pins.map((p) => `<a href="#/c/${p.x.C.id}" class="aa-pin"><circle cx="${p.px.toFixed(0)}" cy="${p.py.toFixed(0)}" r="4"/>${show.has(p.i) ? `<text x="${p.px.toFixed(0)}" y="${(p.py - 9).toFixed(0)}" class="aa-lbl">${esc(p.x.C.name)}</text>` : ""}</a>`).join("")}
+      </svg>`;
+    }
+    const compass = `<svg class="aa-compass" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="rgba(250,245,233,.75)" stroke="#5b5040" stroke-width="1.2"/><circle cx="50" cy="50" r="38" fill="none" stroke="#5b5040" stroke-width=".8" stroke-dasharray="1 3"/><path d="M50 6 L57 50 L50 94 L43 50Z" fill="#b4512f"/><path d="M6 50 L50 43 L94 50 L50 57Z" fill="#5b5040" opacity=".55"/><path d="M50 6 L57 50 L50 50Z" fill="#7a2f17"/><text x="50" y="21" text-anchor="middle" font-size="10" font-weight="800" fill="#2a241c" font-family="IBM Plex Mono">N</text></svg>`;
+
+    const FILTERS = [["all", T("الكل", "All")], ["cheap", T("الأرخص", "Cheapest")], ["free", T("بدون تأشيرة", "Visa-free")], ["beach", T("بحر", "Beaches")], ["nature", T("جبال وطبيعة", "Mountains")]];
+    const rot = [-1.2, 0.8, -0.6, 1, 0.6, -1, 1.1, -0.7];
+    const postcard = ({ C, day, free, beach, nature, places }, i) => `
+      <a class="ap-card" href="#/c/${C.id}" style="--r:${rot[i % rot.length]}deg" data-free="${free ? 1 : 0}" data-beach="${beach ? 1 : 0}" data-nature="${nature ? 1 : 0}" data-cheap="${i < 8 ? 1 : 0}">
+        <span class="ap-ph">${scene(C.scene, true)}${photoOver(cityWiki(C.cities[0]))}</span>
+        <span class="at-stamp ap-post"><small>${T("يومك", "a day")}</small><b>${fmt(day)}</b><small>${T("ريال", "SAR")}</small></span>
+        <span class="ap-b"><b class="ap-n">${esc(C.name)}</b><span class="ap-flag">${C.flag}</span><span class="ap-t">${esc(C.tagline)}</span>
+          <span class="ap-meta"><span>${C.cities.length} ${T("مدن", "cities")} · ${places} ${T("مكان", "places")}</span>${free ? `<span class="ok">✓ ${T("بدون تأشيرة", "Visa-free")}</span>` : `<span>🛂 ${T("تأشيرة", "Visa needed")}</span>`}</span></span>
       </a>`;
-    const asia = W.continents.find((k) => k.open);
-    app.innerHTML = posterHero({
-      kick: T("🌏 دليلك العربي للسفر", "🌏 Travel planning that starts with your budget"),
-      title: T("ميزانيتك", "Your budget,"), sub: T("توديك وين؟", "where can it take you?"),
-      lead: T("اكتب كم معك، ونطلع لك كل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend and we'll show every country it covers — how many days, what comfort level, and what you'll have left."),
-      body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, mode: st.budgetMode, go: T("وين تكفيني؟", "Where can I go?") }) +
-        `<div class="hx-hero-links"><button type="button" class="dice-btn hero-dice" data-surprise>🎲 ${T("فاجئني بدولة وخطة", "Surprise me")}</button>` +
-        `<a class="app-chip" href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("تطبيق الأندرويد", "Android app")}</a></div>` +
-        `<div class="hx-proof"><span><b>${ready.length}</b> ${T("دولة جاهزة", "countries")}</span><span><b>${ready.reduce((a, C) => a + C.cities.length, 0)}</b> ${T("مدينة", "cities")}</span><span><b>${info.reduce((a, x) => a + x.places, 0)}</b> ${T("مكان مع صور", "places")}</span></div>`,
-      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T(`آسيا<br>${ready.length} دولة<br>جاهزة`, `Asia<br>${ready.length}<br>countries`) },
-    }) + `
-      <div class="hx">
-        <div class="wrap">
-          <section class="hx-sec">
-            <div class="hx-head"><div><h2>${T("وجهات جاهزة لك", "Ready to explore")}</h2><p>${T("مرتبة من الأرخص. اضغط على أي دولة وشوف مدنها وأسعارها وبرامجها.", "Sorted from the cheapest. Tap a country for its cities, prices and plans.")}</p></div>
-              <a class="hx-all" href="#/asia">${T("قارن بميزانيتك", "Compare with your budget")} ›</a></div>
-            <div class="hx-filters" role="tablist">${FILTERS.map(([k, l], i) => `<button type="button" class="${i ? "" : "on"}" data-f="${k}">${l}</button>`).join("")}</div>
-            <div class="hx-grid" id="hxGrid">${info.map(ccard).join("")}</div>
-          </section>
+    const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
+    const plates = W.continents.map((k, i) => `
+      <${k.open ? `a href="#/${k.id}"` : "div"} class="ac-plate ${k.open ? "big" : "soon"}">
+        <span class="ac-art">${scene(k.scene, true)}</span><span class="ac-no">PLATE ${ROMAN[i]}</span>
+        ${k.open ? "" : `<span class="at-stamp ac-soon">${T("قريبًا", "Soon")}</span>`}
+        <span class="ac-lab"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small>${k.open ? `<em>${T(`${ready.length} دولة جاهزة ←`, `${ready.length} countries ready →`)}</em>` : ""}</span>
+      </${k.open ? "a" : "div"}>`).join("");
 
-          <section class="hx-sec hx-how">
-            <h2>${T("كيف يشتغل رحّال؟", "How it works")}</h2>
-            <div class="hx-steps">
-              <div><span>1</span><b>${T("اكتب ميزانيتك", "Enter your budget")}</b><p>${T("للمجموعة أو للشخص، مع المدة وعدد المسافرين.", "For the group or per person, with days and travellers.")}</p></div>
-              <div><span>2</span><b>${T("اختر من الخيارات", "Pick an option")}</b><p>${T("عشرات المسارات المرتبة، أو صمّم رحلتك على ذوقك.", "Dozens of ranked routes — or design your own trip.")}</p></div>
-              <div><span>3</span><b>${T("استلم برنامجك", "Get your plan")}</b><p>${T("يوم بيوم، مع مصروف كل يوم وروابط الحجز بتواريخك.", "Day by day, with daily spending and booking links for your dates.")}</p></div>
+    app.innerHTML = `
+      <section class="aa">
+        <div class="aa-text">
+          <span class="at-kicker">${T("أطلس رحّال · الإصدار ٢٠٢٦", "The Rahhal Atlas · 2026 edition")}</span>
+          <h1>${T("العالم أقرب<br>مما <em>تتخيل</em>", "The world is closer<br>than you <em>think</em>")}</h1>
+          <p class="aa-lead">${T("اكتب ميزانيتك، ونفتح لك الأطلس على كل دولة تكفيها: كم يوم تعيش فيها، وبأي مستوى، وكم يبقى معك.", "Tell us your budget and we'll open the atlas on every country it covers — how many days, what comfort, and what's left over.")}</p>
+          <form class="aa-bp" id="worldBudget">
+            <div class="aa-bm">
+              <div class="aa-rt"><span class="aa-ap"><b>RUH</b><small>${T("الرياض", "Riyadh")}</small></span><svg class="aa-ln" viewBox="0 0 100 20" preserveAspectRatio="none"><path class="at-route" d="M0,16 Q50,-4 100,16" vector-effect="non-scaling-stroke"/></svg><span class="aa-ap end"><b>? ? ?</b><small>${T("وين تكفيك؟", "Where to?")}</small></span></div>
+              <div class="aa-fs">
+                <div class="aa-f wide"><span class="aa-row"><small>${T("الميزانية · ريال", "BUDGET · SAR")}</small>${modeSelect(st.budgetMode)}</span><input name="b" inputmode="numeric" value="${fmt(Math.round(st.budgetSAR))}" aria-label="${T("الميزانية", "Budget")}"></div>
+                <label class="aa-f"><small>DAYS · ${T("المدة", "Days")}</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], st.days, dayWord)}</select></label>
+                <label class="aa-f"><small>PAX · ${T("المسافرون", "Travellers")}</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], st.travelers, paxWord)}</select></label>
+              </div>
             </div>
-          </section>
-
-          <section class="hx-sec">
-            <h2>${T("القارات", "Continents")}</h2>
-            <div class="hx-conts">
-              <a class="hx-asia" href="#/${asia.id}"><span class="hx-art">${scene(asia.scene, true)}</span><span class="hx-ab"><b>${esc(asia.name)}</b><small>${esc(asia.blurb)}</small><em>${T(`${ready.length} دولة جاهزة ›`, `${ready.length} countries ready ›`)}</em></span></a>
-              <div class="hx-soon">${W.continents.filter((k) => !k.open).map((k) => `<div><span class="hx-art">${scene(k.scene, true)}</span><b>${esc(k.name)}</b><small>${T("قريبًا", "Coming soon")}</small></div>`).join("")}</div>
-            </div>
-          </section>
+            <button class="aa-stub" type="submit"><small class="at-mono">GATE A1</small>${T("افتح الأطلس ←", "Open the atlas →")}</button>
+          </form>
+          <div class="aa-under"><span><b>${ready.length}</b>${T("دولة", "countries")}</span><i></i><span><b>${totalCities}</b>${T("مدينة", "cities")}</span><i></i><span><b>${totalPlaces}</b>${T("مكان", "places")}</span><i></i><button type="button" data-surprise>🎲 ${T("فاجئني", "Surprise me")}</button><a href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("التطبيق", "App")}</a></div>
         </div>
+        <div class="aa-mapwrap">${atlasMap}<span class="aa-plate at-mono">PLATE 01 · ASIA</span>${compass}<span class="aa-legend"><b>${T("رحلاتك من الرياض", "Your routes from Riyadh")}</b>${T("اضغط على أي دولة وافتح دليلها", "Tap any country to open its guide")}</span></div>
+      </section>
+
+      <div class="wrap">
+        <section class="at-sec">
+          <div class="at-h"><div><span class="at-kicker">${T("الفصل الأول", "Chapter one")}</span><h2>${T("تصفّح الأطلس", "Browse the atlas")}</h2><p>${T("كل قارة لوحة في الأطلس. بدأنا بآسيا، والباقي نرسمه الحين.", "Each continent is a plate in the atlas. Asia is ready; the rest are on the drawing board.")}</p></div></div>
+          <div class="ac-grid">${plates}</div>
+        </section>
+
+        <section class="at-sec">
+          <div class="at-h"><div><span class="at-kicker">${T("من دفتر الرحّال", "From the traveller's notebook")}</span><h2>${T("بطاقات من وجهات تنتظرك", "Postcards from places waiting for you")}</h2><p>${T("مرتبة من الأرخص. كل بطاقة تفتح لك دليل الدولة كامل.", "Sorted from the cheapest. Each card opens the country's full guide.")}</p></div>
+            <div class="at-chips" role="tablist">${FILTERS.map(([k, l], i) => `<button type="button" class="${i ? "" : "on"}" data-f="${k}">${l}</button>`).join("")}</div></div>
+          <div class="ap-grid" id="apGrid">${info.map(postcard).join("")}</div>
+        </section>
+
+        <section class="at-sec">
+          <div class="at-h"><div><span class="at-kicker">${T("قبل الإقلاع", "Before take-off")}</span><h2>${T("ثلاث محطات وتطلع", "Three stops to departure")}</h2></div></div>
+          <div class="at-tags">
+            <div class="at-tag"><span class="hole"></span><span class="at-mono no">01 · CHECK-IN</span><b>${T("اكتب ميزانيتك", "Enter your budget")}</b><p>${T("للمجموعة أو للشخص، مع المدة وعدد المسافرين.", "For the group or per person, with days and travellers.")}</p></div>
+            <div class="at-tag"><span class="hole"></span><span class="at-mono no">02 · ROUTE</span><b>${T("اختر مسارك", "Choose your route")}</b><p>${T("عشرات المسارات المرتبة، أو صمّم رحلتك بنفسك.", "Dozens of ranked routes — or design your own.")}</p></div>
+            <div class="at-tag"><span class="hole"></span><span class="at-mono no">03 · BOARDING</span><b>${T("استلم دفترك", "Get your travel diary")}</b><p>${T("برنامج يوم بيوم، مصروف كل يوم، وروابط الحجز بتواريخك.", "A day-by-day plan, daily spending, and booking links for your dates.")}</p></div>
+          </div>
+        </section>
       </div>`;
     document.getElementById("worldBudget").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -421,11 +467,11 @@
       store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = "#/asia";
     });
-    const grid = document.getElementById("hxGrid");
-    app.querySelector(".hx-filters").addEventListener("click", (e) => {
+    const grid = document.getElementById("apGrid");
+    app.querySelector(".at-chips").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-f]"); if (!b) return;
-      app.querySelectorAll(".hx-filters button").forEach((x) => x.classList.toggle("on", x === b));
-      grid.querySelectorAll(".hx-cc").forEach((x) => { x.hidden = b.dataset.f !== "all" && x.dataset[b.dataset.f] !== "1"; });
+      app.querySelectorAll(".at-chips button").forEach((x) => x.classList.toggle("on", x === b));
+      grid.querySelectorAll(".ap-card").forEach((x) => { x.hidden = b.dataset.f !== "all" && x.dataset[b.dataset.f] !== "1"; });
     });
     loadPhotos(app);
   }
@@ -529,60 +575,65 @@
   // ---------- الرئيسية ----------
   function viewCountry() {
     const plan = getPlan();
-    const cards = D.cities.map((c, i) => posterCard({
-      href: `${B()}/city/${c.id}`, art: cityScene(c, true), wiki: cityWiki(c), flag: c.emoji, i,
-      title: c.name, left: `${c.places.length} ${T("مكان", "places")} · ${dayWord(c.days.ideal)}`, right: `${T("من", "from")} ${money(c.costs.hotel.eco)}`,
-    })).join("");
-
+    const M = window.MAPS && window.MAPS[D.id];
+    const cap = D.cities.find((c) => M && c.id === (M.main || M.capital)) || D.cities[0];
+    const day = Math.max(10, Math.round(Math.min(...D.cities.map((c) => (c.costs.hotel.eco / 2 + c.costs.food.eco + c.costs.transport.eco) / D.currency.perSAR)) / 5) * 5);
+    const best = (cap.bestTime || "").split(/[.،:]/)[0];
+    const ISO = { vietnam: "VNM", thailand: "THA", malaysia: "MYS", indonesia: "IDN", turkey: "TUR", japan: "JPN", southkorea: "KOR", srilanka: "LKA", singapore: "SGP", georgia: "GEO", azerbaijan: "AZE", kyrgyzstan: "KGZ", uzbekistan: "UZB", kazakhstan: "KAZ", laos: "LAO", cambodia: "KHM", nepal: "NPL", armenia: "ARM", tajikistan: "TJK" };
+    const code = ISO[D.id] || D.id.slice(0, 3).toUpperCase();
+    const vol = String(Object.keys(W.countries).indexOf(D.id) + 1).padStart(2, "0");
+    const gems = allPlaces.filter((p) => p.gem);
     const picks = D.cities.flatMap((c) => allPlaces.filter((p) => p.city === c && !p.gem).slice(0, D.cities.length > 6 ? 1 : 2)).slice(0, 8);
+    const rot = [-1, 1, -0.6, 0.8, -0.8, 0.6, -1.1, 0.9];
+    const print = (p, i) => `<button type="button" class="ag-pr" data-place="${p.key}" style="--r:${rot[i % rot.length]}deg"><span class="ag-pph">${photoBox(p)}</span><b>${esc(p.name)}</b>${p.gem ? `<span class="ag-gem at-mono">HIDDEN GEM</span>` : `<span class="ag-rate">★ ${p.rating.toFixed(1)}</span>`}<small>${esc(p.city.short || p.city.name)} · ${esc(p.time)}</small></button>`;
+    const TOC = [["cities", T("المدن", "Cities")], ...(gems.length ? [["gems", T("الجواهر المخفية", "Hidden gems")]] : []), ["picks", T("لا تفوّتها", "Don't miss")], ["plan", T("خطط رحلتك", "Plan a trip")]];
+    const entry = (c, i) => {
+      const tags = Object.entries(c.interests).filter(([, v]) => v >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => `<span>${ICONS[k]} ${esc(D.interests[k])}</span>`).join("");
+      return `<a class="ag-en" href="${B()}/city/${c.id}" data-ci="${c.id}">
+        <span class="ag-eph">${cityScene(c, true)}${photoOver(cityWiki(c))}<span class="ag-num">${String(i + 1).padStart(2, "0")}</span></span>
+        <span class="ag-eb"><span class="ag-reg">${esc(c.region)}</span><b class="ag-h3">${esc(c.name)}</b><span class="ag-p">${esc(c.summary)}</span>
+          ${tags ? `<span class="ag-tg">${tags}</span>` : ""}
+          <span class="ag-ft"><span>${T("الليلة من", "Nights from")} <b>${money(c.costs.hotel.eco)}</b> · ${dayWord(c.days.ideal)} · ${c.places.length} ${T("مكان", "places")}</span><em>${T("افتح الصفحة ←", "Open →")}</em></span></span>
+      </a>`;
+    };
 
-    const top = D.cities[0];
-    app.innerHTML = posterHero({
-      kick: `<a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ${T("‹", "›")} ${D.flag}`,
-      title: esc(D.name),
-      lead: esc(D.tagline),
-      body: `
-        <div class="paper prep">
-          <div class="prep-h"><b class="display">${T("قبل لا تحجز", "Before you book")}</b>${passport() === "sa" ? `<span>🛂 ${esc(D.visaNote)}</span>` : ""}</div>
-          ${passportPicker()}
-          ${passport() !== "sa" ? `<p class="visa-ye">🛂 ${esc(visaText(D))}</p>` : ""}
-          <div class="facts3">
-            <div>${T("العملة", "Currency")}<b>${T(`${esc(D.currency.name)} (${fmt(D.currency.perSAR, 2)} = ريال)`, `SAR 1 = ${fmt(D.currency.perSAR, 2)} ${esc(D.currency.name)}`)}</b></div>
-            <div>${T("الطيران من السعودية", "Flights from Saudi")}<b>${T(`~${fmt(D.flightSAR)} ريال`, `~SAR ${fmt(D.flightSAR)}`)}</b></div>
-            <div>${T("الوجهات", "Destinations")}<b>${T(`${D.cities.length} وجهة · ${allPlaces.length} مكان`, `${D.cities.length} destinations · ${allPlaces.length} places`)}</b></div>
-          </div>
-        </div>
-        <div class="cta-row"><a class="map-cta" href="${B()}/build">🧭 ${T("صمّم رحلتك على ذوقك", "Design your own trip")}</a>${window.MAPS && window.MAPS[D.id] ? `<a class="map-cta" href="${B()}/map">🗺️ ${T("خريطة الأسعار", "Price map")}</a>` : ""}</div>
-        ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate() / (plan.budgetMode === "pp" ? plan.travelers : 1)), unit: curName(), days: plan.days, travelers: plan.travelers, mode: plan.budgetMode, go: T("وريني الخيارات", "Show my options") })}`,
-      poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: T(`${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, `${top.places.length} places · ${dayWord(top.days.ideal)} suggested`), stamp: T(`${D.cities.length}<br>وجهات`, `${D.cities.length}<br>stops`) },
-    }) + `
+    app.innerHTML = `
+      <section class="ag-cover">
+        <div class="ag-bg">${cityScene(cap, true)}${photoOver(cityWiki(cap))}</div>
+        <nav class="ag-crumb"><a href="#/">${T("الأطلس", "Atlas")}</a> ‹ <a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ‹ <b>${esc(D.name)}</b></nav>
+        <span class="ag-vol at-mono">GUIDE · VOL. ${vol} · ${esc(code)}</span>
+        <span class="at-stamp ag-stamp">${esc(code)}<b>${esc(D.name)}</b>${D.flag} 2026</span>
+        <div class="ag-cv"><span class="at-kicker">${T("دليل رحّال للسفر", "The Rahhal travel guide")}</span><h1>${esc(D.name)}</h1><p>${esc(D.tagline)}</p></div>
+      </section>
+      <div class="ag-facts">
+        <div class="ag-lt ag-visa"><small>VISA · ${T("التأشيرة", "Visa")}</small><b>${esc(visaText(D))}</b>${passportPicker()}</div>
+        <div class="ag-lt"><small>CURRENCY · ${T("العملة", "Currency")}</small><b>${esc(D.currency.name)}</b><span>${T(`1 ريال ≈ ${fmt(D.currency.perSAR, 2)}`, `SAR 1 ≈ ${fmt(D.currency.perSAR, 2)}`)}</span></div>
+        <div class="ag-lt"><small>FLIGHT · ${T("الطيران", "Flights")}</small><b>${T(`~${fmt(D.flightSAR)} ريال`, `~SAR ${fmt(D.flightSAR)}`)}</b><span>${T("ذهاب وعودة من السعودية", "Return from Saudi")}</span></div>
+        <div class="ag-lt"><small>BEST · ${T("أفضل وقت", "Best time")}</small><b>${esc(best)}</b><span>${esc(cap.short || cap.name)}</span></div>
+        <div class="ag-lt"><small>DAILY · ${T("يومك من", "From")}</small><b class="t">${T(`${fmt(day)} ريال`, `SAR ${fmt(day)}`)}</b><span>${T("للشخص، اقتصادي", "per person, budget")}</span></div>
+      </div>
+      <nav class="ag-toc" id="agToc"><div class="wrap">${TOC.map(([k, l], i) => `<a href="#ag-${k}" data-k="${k}" class="${i ? "" : "on"}"><i class="at-mono">${String(i + 1).padStart(2, "0")}</i>${l}</a>`).join("")}<a href="${B()}/before"><i class="at-mono">${String(TOC.length + 1).padStart(2, "0")}</i>${T("قبل السفر", "Before you go")}</a></div></nav>
+
       <div class="wrap">
-        <section class="band" id="cities">
-          <div class="band-head"><div><h2 class="display">${T("الوجهات", "Destinations")}</h2><p>${T("اضغط على أي ملصق وشوف أماكنه وأسعاره.", "Tap a poster to see its places and prices.")}</p></div></div>
-          <div class="posters rail">${cards}</div>
+        <section class="ag-ch" id="ag-cities">
+          <div class="ag-list">
+            <div class="at-h"><div><span class="at-kicker">${T("الفصل الأول", "Chapter one")}</span><h2>${T("مدن تستاهل الرحلة", "Places worth the trip")}</h2><p>${T(`${D.cities.length} وجهة مرقمة على الخريطة. اضغط على أي وحدة وافتح صفحتها.`, `${D.cities.length} stops, numbered on the map. Tap any to open its page.`)}</p></div></div>
+            <div class="ag-entries">${D.cities.map(entry).join("")}</div>
+          </div>
+          <aside class="ag-mapbox"><div class="ag-mh"><b>${T(`خريطة ${esc(D.name)}`, `Map of ${esc(D.name)}`)}</b><span class="at-mono">PLATE ${vol} · ${esc(code)}</span></div>
+            <div class="ag-map" id="agMap"><span class="ag-load">🗺️</span></div>
+            ${M ? `<a class="at-btn ghost ag-mapbtn" href="${B()}/map">🗺️ ${T("افتح خريطة الأسعار التفاعلية", "Open the interactive price map")}</a>` : ""}</aside>
         </section>
 
-        ${allPlaces.some((p) => p.gem) ? `
-        <section class="band gems-band">
-          <div class="band-head">
-            <div><h2 class="display">💎 ${T("جواهر ما يعرفها السياح", "Hidden gems")}</h2><p>${T("أماكن رائعة وموثّقة، لكن أغلب الزوار يفوّتونها.", "Wonderful, well-loved places that most visitors miss.")}</p></div>
-          </div>
-          <div class="pgrid rail">${allPlaces.filter((p) => p.gem).map((p) => placeCard(p, { showCity: true })).join("")}</div>
-        </section>` : ""}
+        ${gems.length ? `<section class="at-sec" id="ag-gems"><div class="at-h"><div><span class="at-kicker">${T("الفصل الثاني", "Chapter two")}</span><h2>${T("جواهر ما يعرفها السياح", "Gems most visitors miss")}</h2><p>${T("أماكن رائعة وموثّقة، لكن أغلب الزوار يفوّتونها.", "Wonderful, well-loved places that most visitors miss.")}</p></div></div><div class="ag-prints">${gems.map(print).join("")}</div></section>` : ""}
 
-        <section class="band">
-          <div class="band-head">
-            <div><h2 class="display">${T("أماكن لازم تشوفها", "Don't miss")}</h2><p>${T("اضغط على أي مكان وشوف صورته وتفاصيله.", "Tap any place for photos and details.")}</p></div>
-            <a class="btn ghost" href="${B()}/places">${T("كل الأماكن", "All places")} (${allPlaces.length})</a>
-          </div>
-          <div class="pgrid rail">${picks.map((p) => placeCard(p, { showCity: true })).join("")}</div>
-        </section>
+        <section class="at-sec" id="ag-picks"><div class="at-h"><div><span class="at-kicker">${T("من صفحات الدليل", "From the guide")}</span><h2>${T("أماكن لا تفوّتها", "Don't miss")}</h2></div><a class="ag-all" href="${B()}/places">${T(`كل الأماكن (${allPlaces.length}) ←`, `All ${allPlaces.length} places →`)}</a></div><div class="ag-prints">${picks.map(print).join("")}</div></section>
 
-        <section class="band">
-          <div class="tiles">
-            <a class="tile" href="${B()}/before"><div class="ico">🧳</div><h3>${T("قائمة التجهيز", "Trip checklist")}</h3><p>${T("التأشيرة والصرف والشريحة، وأشّر على اللي خلصته.", "Visa, money, SIM — tick things off as you go.")}</p></a>
-            <a class="tile" href="${B()}/places"><div class="ico">🕌</div><h3>${T("أكل حلال ومساجد", "Halal food & mosques")}</h3><p>${T("في كل وجهة قسم للمطاعم الحلال والمساجد القريبة.", "Every destination lists halal food and nearby mosques.")}</p></a>
-            <div class="tile"><div class="ico">🔎</div><h3>${T("كل رقم له مصدر", "Every number is sourced")}</h3><p>${T("جنب كل سعر مصدره وتاريخ آخر تحقق منه.", "Each price shows where it came from and when it was checked.")}</p></div>
+        <section class="at-sec" id="ag-plan">
+          <div class="ag-plan">
+            <div><span class="at-kicker">${T("خطط رحلتك", "Plan your trip")}</span><h2>${T(`كم تكفيك ميزانيتك في ${esc(D.name)}؟`, `How far will your budget go in ${esc(D.name)}?`)}</h2><p>${T("اكتب ميزانيتك ونطلع لك كل المسارات، أو صمّم رحلتك بنفسك.", "Enter your budget for every possible route — or design your own trip.")}</p>
+              <div class="ag-planbtns"><a class="at-btn ghost" href="${B()}/build">🧭 ${T("صمّم رحلتك على ذوقك", "Design your own trip")}</a></div></div>
+            ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate() / (plan.budgetMode === "pp" ? plan.travelers : 1)), unit: curName(), days: plan.days, travelers: plan.travelers, mode: plan.budgetMode, go: T("وريني الخيارات", "Show my options") })}
           </div>
         </section>
       </div>`;
@@ -593,6 +644,46 @@
       savePlan({ ...getPlan(), ...(t.b > 0 ? { budget: t.b * rate() * (t.m === "pp" ? t.t : 1) } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = B() + "/plan";
     });
+    // فهرس الفصول
+    const toc = document.getElementById("agToc");
+    toc.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-k]"); if (!a) return;
+      e.preventDefault();
+      const sec = document.getElementById("ag-" + a.dataset.k);
+      window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 70, behavior: reduced ? "auto" : "smooth" });
+    });
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((ents) => ents.forEach((en) => { if (en.isIntersecting) toc.querySelectorAll("a[data-k]").forEach((x) => x.classList.toggle("on", "ag-" + x.dataset.k === en.target.id)); }), { rootMargin: "-40% 0px -55% 0px" });
+      TOC.forEach(([k]) => { const el = document.getElementById("ag-" + k); if (el) io.observe(el); });
+    }
+    // خريطة الدليل: حدود الدولة الحقيقية من geo.js مع خلفية آسيا
+    const drawMap = () => {
+      const box = document.getElementById("agMap"), A = window.ATLAS_ASIA, G = window.GEO && window.GEO[D.id];
+      if (!box || !A || !G) return;
+      const PJ = (lat, lon) => [A.proj.ox + (lon - A.proj.L0) * A.proj.kx * A.proj.sc, A.proj.oy + (A.proj.B1 - lat) * A.proj.sc];
+      const ring = (r) => "M" + r.map(([lo, la]) => PJ(la, lo).map((v) => v.toFixed(2)).join(" ")).join("L") + "Z";
+      const pts = D.cities.map((c) => PJ(c.lat, c.lon));
+      const [x0, y0] = PJ(G.bbox[3], G.bbox[0]), [x1, y1] = PJ(G.bbox[1], G.bbox[2]);
+      let bx0 = Math.min(x0, ...pts.map((p) => p[0])), bx1 = Math.max(x1, ...pts.map((p) => p[0])), by0 = Math.min(y0, ...pts.map((p) => p[1])), by1 = Math.max(y1, ...pts.map((p) => p[1]));
+      const pad = Math.max(bx1 - bx0, by1 - by0) * 0.08 + 1;
+      bx0 -= pad; bx1 += pad; by0 -= pad; by1 += pad;
+      const w = bx1 - bx0, h = by1 - by0, u = Math.max(w, h) / 300;
+      const route = "M" + pts.map((p) => p.map((v) => v.toFixed(2)).join(" ")).join("L");
+      box.style.aspectRatio = `${w} / ${h}`;
+      box.innerHTML = `<svg viewBox="${bx0} ${by0} ${w} ${h}" role="img" aria-label="${T("خريطة الدولة", "Country map")}">
+        <rect x="${bx0}" y="${by0}" width="${w}" height="${h}" fill="#cfe0d8"/>
+        <path d="${A.land}" fill="#e7dcc1" stroke="#b9a27a" stroke-width="${u * 0.6}"/>
+        <path d="${G.rings.map(ring).join("")}" fill="#f6eedb" stroke="#8b6f45" stroke-width="${u}"/>
+        <path d="${route}" fill="none" stroke="#b4512f" stroke-width="${u * 1.6}" stroke-dasharray="${u * 0.5} ${u * 5}" stroke-linecap="round" opacity=".8"/>
+        ${pts.map((p, i) => `<a href="${B()}/city/${D.cities[i].id}" class="ag-pin" data-ci="${D.cities[i].id}"><circle cx="${p[0]}" cy="${p[1]}" r="${u * 8}" stroke-width="${u * 2}"/><text x="${p[0]}" y="${p[1] + u * 3.2}" font-size="${u * 8.5}">${i + 1}</text><title>${esc(D.cities[i].name)}</title></a>`).join("")}
+      </svg>`;
+    };
+    if (window.GEO) drawMap();
+    else { const sc = document.createElement("script"); sc.src = "data/geo.js"; sc.onload = drawMap; document.head.appendChild(sc); }
+    // تمييز المدينة في الخريطة عند المرور على بطاقتها
+    if (app._agHover) app.removeEventListener("pointerover", app._agHover);
+    app._agHover = (e) => { if (!document.querySelector(".ag-cover")) return; const en = e.target.closest("[data-ci]"); app.querySelectorAll(".hot").forEach((x) => x.classList.remove("hot")); if (en) app.querySelectorAll(`[data-ci="${en.dataset.ci}"]`).forEach((x) => x.classList.add("hot")); };
+    app.addEventListener("pointerover", app._agHover);
     loadPhotos(app);
   }
 
@@ -1382,74 +1473,82 @@
     const sections = [];
     r.plan.forEach((d) => { if (d.newCity) sections.push({ city: d.city, travel: d.travel, days: [] }); sections[sections.length - 1].days.push(d); });
     const noteIco = (it) => (it.k === "in" ? "🛬" : it.k === "out" ? "🛫" : "☕");
-    const days = sections.map((sec) => `
-      <section class="leg">
-        ${sec.travel ? `<div class="leg-travel"><span class="lt-ico">${sec.travel.flight ? "✈️" : "🚐"}</span><span>${T(`من ${esc(sec.travel.from.short)} إلى ${esc(sec.city.short)}: ${esc(sec.travel.mode)}، ${hoursText(sec.travel.hours)}`, `${esc(sec.travel.from.short)} to ${esc(sec.city.short)}: ${esc(sec.travel.mode)}, ${hoursText(sec.travel.hours)}`)}</span><b>${money(sec.travel.cost[r.tier])} ${T("للشخص", "pp")}</b></div>` : ""}
-        <header class="leg-head">
-          <div class="leg-art">${cityScene(sec.city, true)}</div>
-          <div class="leg-title"><b>${esc(sec.city.name)}</b><span>${T(`${dayWord(sec.days.length)}، من اليوم ${sec.days[0].day}${sec.days.length > 1 ? " إلى " + sec.days[sec.days.length - 1].day : ""}`, `${dayWord(sec.days.length)} · day ${sec.days[0].day}${sec.days.length > 1 ? "–" + sec.days[sec.days.length - 1].day : ""}`)}</span></div>
-          <a class="leg-link" href="${B()}/city/${sec.city.id}" data-close>${T("عن الوجهة", "About")}</a>
-        </header>
-        ${(() => {
-          const a = sec.days[0].day, z = sec.days[sec.days.length - 1].day;
-          const ci = s.startDate ? addDays(s.startDate, a - 1) : "", co = s.startDate ? addDays(s.startDate, Math.min(z, s.days - 1)) : "";
-          return `<div class="leg-book">🛏️ ${s.startDate ? `${T("سكنك هنا", "Your stay")}: <b>${niceDate(ci)} – ${niceDate(co)}</b> ·` : T("شوف أسعار السكن الحقيقية:", "Check live prices:")} ${bookingLinks(sec.city, s.travelers, ci, co)}</div>`;
-        })()}
-        <header style="display:none">
-        </header>
-        ${sec.days.map((d) => `
-          <div class="pday">
-            <div class="pday-n"><small>${s.startDate ? niceDate(addDays(s.startDate, d.day - 1)) : T("اليوم", "Day")}</small>${d.day}</div>
-            <div class="pday-items">${d.items.map((it) => it.p
-              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${it.p.must ? `<span class="must-b">❤️ ${T("اخترته", "Your pick")}</span> ` : ""}${esc(it.p.name)}</b><small>★ ${it.p.rating.toFixed(1)} · ${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
-              : `<div class="prow note-row"><span class="note-ico">${noteIco(it)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
-          </div>`).join("")}
-      </section>`).join("");
+    const TIMES = ["09:00", "14:00", "17:30", "20:00"];
+    const PART = [T("الصبح", "Morning"), T("الظهر", "Afternoon"), T("العصر", "Late afternoon"), T("المساء", "Evening")];
+    const dateOf = (n) => (s.startDate ? niceDate(addDays(s.startDate, n - 1)) : "");
+    const left = s.budget - r.total;
+    const flightsCost = s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0;
+    const breakdown = [["🏨", T("سكن", "Stay"), p.hotel, "#2c5d63"], ["🍽️", T("أكل", "Food"), p.food, "#b4512f"], ["🚕", T("تنقل", "Transport"), p.local + p.inter, "#c39a3e"], ["🎟️", T("دخول", "Entry"), p.fees, "#6f7d57"], ["🛂", T("تأشيرة", "Visa") + (s.flights ? T(" وطيران", " & flights") : ""), p.visa + flightsCost, "#8b7d64"]].filter((x) => x[2] > 0);
+    const stops = r.route.map((c, i) => {
+      const tr = i ? sections.find((x) => x.city === c && x.travel) : null;
+      return `${i ? `<span class="it-leg"><svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><path class="at-route" d="M0,30 Q50,2 100,30" vector-effect="non-scaling-stroke"/></svg>${tr ? `<em>${hopText(tr.travel)}</em>` : ""}</span>` : ""}<span class="it-st"><span class="it-sph">${cityScene(c, true)}</span><b>${esc(c.short || c.name)}</b><small>${dayWord(r.alloc.get(c))}</small></span>`;
+    }).join("");
+    const title = r.route.length === 1 ? T(`${dayWord(s.days)} في ${esc(first.short || first.name)}`, `${dayWord(s.days)} in ${esc(first.short || first.name)}`) : r.route.map((c) => esc(c.short || c.name)).join(` ${FWD} `);
+    const side = sections.map((sec) => `<span class="it-sc at-mono">${esc(sec.city.short || sec.city.name)}</span>` + sec.days.map((d) => {
+      const fp = d.items.find((it) => it.p);
+      return `<a href="#it-d${d.day}" class="it-sd" data-day="${d.day}"><b class="at-mono">${String(d.day).padStart(2, "0")}</b><span>${fp ? esc(fp.p.name) : d.items.some((it) => it.k === "out") ? T("المغادرة", "Departure") : T("يوم حر", "Free day")}</span>${s.startDate ? `<em>${dateOf(d.day)}</em>` : ""}</a>`;
+    }).join("")).join("");
+    const pages = sections.map((sec) => {
+      const a = sec.days[0].day, z = sec.days[sec.days.length - 1].day;
+      const ci = s.startDate ? addDays(s.startDate, a - 1) : "", co = s.startDate ? addDays(s.startDate, Math.min(z, s.days - 1)) : "";
+      return `
+      <section class="leg it-city">
+        ${sec.travel ? `<div class="it-move"><span>${sec.travel.flight ? "✈️" : "🚐"}</span><svg viewBox="0 0 120 10" aria-hidden="true"><path class="at-route" d="M2 5 H118"/></svg><span>${T(`${esc(sec.travel.from.short)} ← ${esc(sec.city.short)}`, `${esc(sec.travel.from.short)} → ${esc(sec.city.short)}`).replace("←", FWD)} · ${esc(sec.travel.mode)} · ${hoursText(sec.travel.hours)}</span><b>${money(sec.travel.cost[r.tiers.transport])} ${T("للشخص", "pp")}</b></div>` : ""}
+        <header class="it-ch"><span class="it-chph">${cityScene(sec.city, true)}${photoOver(cityWiki(sec.city))}</span><span class="it-cht"><span class="at-kicker">${T(`المحطة ${r.route.indexOf(sec.city) + 1}`, `Stop ${r.route.indexOf(sec.city) + 1}`)}</span><b>${esc(sec.city.name)}</b><small>${T(`${dayWord(sec.days.length)} · من اليوم ${a}${z > a ? " إلى " + z : ""}`, `${dayWord(sec.days.length)} · day ${a}${z > a ? "–" + z : ""}`)}</small></span><a class="it-about" href="${B()}/city/${sec.city.id}" data-close>${T("دليل المدينة ←", "City guide →")}</a></header>
+        <div class="leg-book it-stay"><span>🛏️ <b>${T("سكنك هنا", "Your stay")}</b>${s.startDate ? ` · ${niceDate(ci)} – ${niceDate(co)}` : ""}</span>${bookingLinks(sec.city, s.travelers, ci, co)}</div>
+        ${sec.days.map((d) => {
+          const tot = Object.values(d.cost).reduce((x, y) => x + y, 0);
+          let slot = 0;
+          return `
+          <article class="it-page" id="it-d${d.day}">
+            <div class="it-ph"><span class="at-stamp it-dayno"><small>${T("اليوم", "DAY")}</small><b class="at-mono">${String(d.day).padStart(2, "0")}</b><small>${s.startDate ? dateOf(d.day) : esc(sec.city.short || sec.city.name)}</small></span>
+              <div><h3>${(() => { const fp = d.items.find((it) => it.p); return fp ? esc(fp.p.name) : d.items.some((it) => it.k === "out") ? T("يوم المغادرة", "Departure day") : T("يوم على راحتك", "A day at your own pace"); })()}</h3><p>${esc(sec.city.name)}${d.travel ? T(` · وصول من ${esc(d.travel.from.short)}`, ` · arriving from ${esc(d.travel.from.short)}`) : ""}</p></div></div>
+            <div class="it-slots">${d.items.map((it) => {
+              if (!it.p) return `<div class="it-note"><span>${noteIco(it)}</span><span>${esc(it.t)}</span></div>`;
+              const k = slot++;
+              return `<div class="it-slot"><span class="it-tm"><b class="at-mono">${TIMES[k] || ""}</b><small>${PART[k] || ""}</small></span>
+                <button type="button" class="it-card" data-place="${it.p.key}"><span class="it-im">${photoBox(it.p)}</span><span class="it-ct"><b>${it.p.must ? `<span class="must-b">❤️ ${T("اخترته", "Your pick")}</span> ` : ""}${esc(it.p.name)}</b><small>${esc(it.p.desc)}</small><em>⏱ ${esc(it.p.time)} · ★ ${it.p.rating.toFixed(1)}</em></span><span class="it-fee"><small>${T("الدخول", "Entry")}</small><b>${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")}</b></span></button></div>`;
+            }).join("")}</div>
+            <div class="it-rec"><h4 class="at-mono">RECEIPT · ${T("اليوم", "DAY")} ${String(d.day).padStart(2, "0")}</h4>${Object.keys(DCOL).filter((k) => d.cost[k] > 0).map((k) => `<div><span>${DCOL[k][0]} ${DCOL[k][2]()}</span><span>${money(d.cost[k])}</span></div>`).join("")}<div class="t"><span>${T("المجموع", "Total")}</span><span>${money(tot)}</span></div></div>
+          </article>`;
+        }).join("")}
+      </section>`;
+    }).join("");
 
     dlg.innerHTML = `
-      <div class="dlg-in wide">
+      <div class="dlg-in wide it">
         <button type="button" class="dlg-x" data-close aria-label="${T("إغلاق", "Close")}">✕</button>
-        <div class="pass">
-          <div class="pass-art">${cityScene(last, true)}<span class="ttl">${T("بطاقة رحلتك", "Your boarding pass")}</span></div>
-          <div class="pass-main">
-            <div class="pass-route">
-              <div class="code">${esc(first.code || first.en)}<small>${esc(first.name)}</small></div>
-              <div class="line"></div>
-              <div class="code">${esc(last.code || last.en)}<small>${esc(last.name)}</small></div>
-            </div>
-            <div class="pass-fields">
-              <div>${T("المدة", "Length")}<b>${dayWord(s.days)}</b>${s.startDate ? `<small class="pass-dates">${niceDate(s.startDate)} – ${niceDate(s.endDate)}</small>` : ""}</div>
-              <div>${T("المسافرون", "Travellers")}<b>${paxWord(s.travelers)}</b></div>
-              <div>${T("المستوى", "Comfort")}<b>${tiersLabel(r.tiers, true)}</b></div>
-              <div>${T("المحطات", "Stops")}<b>${EN_ON ? r.route.length + (r.route.length === 1 ? " stop" : " stops") : r.route.length === 1 ? "وجهة وحدة" : r.route.length === 2 ? "وجهتين" : r.route.length + " وجهات"}</b></div>
-            </div>
+        <div class="it-tk">
+          <div class="it-m">
+            <div class="it-top at-mono"><span>ITINERARY · ${fltNo(r)}</span><span>${s.startDate ? `${niceDate(s.startDate)} – ${niceDate(s.endDate)}` : dayWord(s.days)}</span></div>
+            <h2 class="it-title">${title}</h2>
+            <p class="it-sub">${T(`برنامج ${tiersLabel(r.tiers)} لـ ${paxWord(s.travelers)} في ${esc(D.name)}`, `A ${tiersLabel(r.tiers)} plan for ${paxWord(s.travelers)} in ${esc(D.name)}`)}</p>
+            <div class="it-stops">${stops}</div>
           </div>
-          <div class="pass-stub">
-            <div><div class="k">${T("التكلفة التقريبية", "Estimated total")}</div><div class="amount">${money(r.total)}</div><div class="k">${money(r.total / s.travelers)} ${T("للشخص", "per person")}</div></div>
-            <div class="barcode" aria-hidden="true"></div>
+          <div class="it-stub">
+            <small class="at-mono">TOTAL · ${T("الإجمالي", "Total")}</small>
+            <b class="it-tot">${money(r.total)}</b>
+            <span class="it-pp">${money(r.total / s.travelers)} ${T("للشخص", "pp")} · <em class="${left < 0 ? "neg" : ""}">${left < 0 ? T("ينقصك", "Short") : T("يبقى", "Left")} ${money(Math.abs(left))}</em></span>
+            <div class="it-bar">${breakdown.map((x) => `<i style="flex:${x[2]};background:${x[3]}"></i>`).join("")}</div>
+            <div class="it-rows">${breakdown.map((x) => `<span><i style="background:${x[3]}"></i>${x[0]} ${x[1]}<b>${money(x[2])}</b></span>`).join("")}</div>
+            <button class="at-btn no-print" type="button" onclick="window.print()">${T("احفظ الدفتر PDF", "Save diary as PDF")}</button>
+            <div class="it-barcode" aria-hidden="true"></div>
           </div>
-        </div>
-        <div class="costs">
-          <div>${T("السكن", "Hotels")}<b>${money(p.hotel)}</b></div>
-          <div>${T("الأكل", "Food")}<b>${money(p.food)}</b></div>
-          <div>${T("التنقل الداخلي", "Local transport")}<b>${money(p.local)}</b></div>
-          <div>${T("بين الوجهات", "Between stops")}<b>${money(p.inter)}</b></div>
-          <div>${T("رسوم الأماكن", "Entry fees")}<b>${money(p.fees)}</b></div>
-          <div>${T("التأشيرة", "Visa")}${s.flights ? T(" والطيران", " & flights") : ""}<b>${money(p.visa + (s.flights ? D.flightSAR * D.currency.perSAR * s.travelers : 0))}</b></div>
         </div>
         ${dayChart(r, s)}
-        <p class="hint">${r.hotelNight ? T(`💰 السكن حسب ميزانيتك: ${money(r.hotelNight)} لليلة. `, `💰 Hotels use your budget: ${money(r.hotelNight)} a night. `) : ""}${sameTiers(r.tiers) ? D.tiers[r.tier].desc + ". " : ""}${r.stay === "apt" ? T("السكن شقة Airbnb كاملة لكل 4 أشخاص (سعر تقديري).", "Lodging is a whole Airbnb apartment per 4 people (estimated price).") : r.stay === "room" ? T("السكن غرفة خاصة في Airbnb لكل شخصين (سعر تقديري).", "Lodging is a private Airbnb room per 2 people (estimated price).") : T("السكن غرفة فندقية لكل شخصين.", "Hotels assume one room per two travellers.")} ${T("الأسعار تقريبية، وتقدر تشوف السعر الحقيقي من روابط Booking وAirbnb في كل وجهة.", "Prices are estimates — check live prices with the Booking and Airbnb links for each stop.")}</p>
-        <div class="trip">
-          <div class="legs">${days}</div>
-          <div class="map">${mapSVG(r.route, { animate: true })}</div>
+        <p class="it-hint">${r.hotelNight ? T(`💰 السكن حسب ميزانيتك: ${money(r.hotelNight)} لليلة. `, `💰 Hotels use your budget: ${money(r.hotelNight)} a night. `) : ""}${r.stay === "apt" ? T("السكن شقة Airbnb كاملة لكل 4 أشخاص (سعر تقديري).", "Lodging is a whole Airbnb apartment per 4 people (estimated).") : r.stay === "room" ? T("السكن غرفة خاصة في Airbnb لكل شخصين (سعر تقديري).", "Lodging is a private Airbnb room per 2 people (estimated).") : T("السكن غرفة فندقية لكل شخصين.", "Hotels assume one room per two travellers.")} ${T("الأسعار تقريبية، وشوف السعر الحقيقي من روابط Booking وAirbnb.", "Prices are estimates — check live prices via the Booking and Airbnb links.")}</p>
+        <div class="it-diary">
+          <aside class="it-side"><span class="at-kicker">${T("دفتر الأيام", "Day by day")}</span><div class="it-sl">${side}</div><div class="it-mini map">${mapSVG(r.route, { animate: true })}</div></aside>
+          <div class="it-pages">${pages}</div>
         </div>
-        <div class="actions no-print"><button class="btn" type="button" onclick="window.print()">${T("اطبع الخطة أو احفظها PDF", "Print or save as PDF")}</button></div>
       </div>`;
     if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     const info = dlg.querySelector("#dcInfo");
     const pick = (i) => { info.innerHTML = dayInfo(r, s, i); dlg.querySelectorAll(".dc-col").forEach((b) => b.classList.toggle("on", +b.dataset.dc === i)); };
     dlg.querySelectorAll(".dc-col").forEach((b) => b.addEventListener("click", () => pick(+b.dataset.dc)));
     pick(0);
+    dlg.querySelectorAll(".it-sd").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); const t = dlg.querySelector("#it-d" + a.dataset.day); if (t) t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" }); dlg.querySelectorAll(".it-sd").forEach((x) => x.classList.toggle("on", x === a)); }));
+    const firstSd = dlg.querySelector(".it-sd"); if (firstSd) firstSd.classList.add("on");
     loadPhotos(dlg);
   }
 
