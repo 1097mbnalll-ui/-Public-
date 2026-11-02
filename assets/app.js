@@ -512,7 +512,7 @@
             <div>${T("الوجهات", "Destinations")}<b>${T(`${D.cities.length} وجهة · ${allPlaces.length} مكان`, `${D.cities.length} destinations · ${allPlaces.length} places`)}</b></div>
           </div>
         </div>
-        ${window.MAPS && window.MAPS[D.id] ? `<a class="map-cta" href="${B()}/map">🗺️ ${T("افتح خريطة الأسعار التفاعلية", "Open the interactive price map")}</a>` : ""}
+        <div class="cta-row"><a class="map-cta" href="${B()}/build">🧭 ${T("صمّم رحلتك على ذوقك", "Design your own trip")}</a>${window.MAPS && window.MAPS[D.id] ? `<a class="map-cta" href="${B()}/map">🗺️ ${T("خريطة الأسعار", "Price map")}</a>` : ""}</div>
         ${ticketForm("heroBudget", { amount: Math.round(plan.budget / rate() / (plan.budgetMode === "pp" ? plan.travelers : 1)), unit: curName(), days: plan.days, travelers: plan.travelers, mode: plan.budgetMode, go: T("وريني الخيارات", "Show my options") })}`,
       poster: { art: cityScene(top, true), wiki: cityWiki(top), title: top.name, caption: T(`${top.places.length} مكان · ${dayWord(top.days.ideal)} مقترحة`, `${top.places.length} places · ${dayWord(top.days.ideal)} suggested`), stamp: T(`${D.cities.length}<br>وجهات`, `${D.cities.length}<br>stops`) },
     }) + `
@@ -794,11 +794,13 @@
     return `<span class="book-links"><a href="${b}" target="_blank" rel="noopener">Booking ↗</a><a href="${a}" target="_blank" rel="noopener">Airbnb ↗</a></span>`;
   }
 
-  function planRoute(route, { days, tier, tiers, stay = "hotel", interests, travelers, hotelNight = 0 }) {
+  function planRoute(route, { days, tier, tiers, stay = "hotel", interests, travelers, hotelNight = 0, fixed = null, pace = 2, must = null }) {
     tiers = { ...(tiers || { hotel: tier, food: tier, transport: tier }) };
-    if (route.reduce((s, c) => s + c.days.min, 0) > days) return null;
-    const alloc = new Map(route.map((c) => [c, c.days.min]));
-    let left = days - route.reduce((s, c) => s + c.days.min, 0);
+    // المستخدم حدد أيام كل مدينة بنفسه
+    if (fixed) days = route.reduce((a, c) => a + fixed[c.id], 0);
+    if (!fixed && route.reduce((s, c) => s + c.days.min, 0) > days) return null;
+    const alloc = new Map(route.map((c) => [c, fixed ? fixed[c.id] : c.days.min]));
+    let left = fixed ? 0 : days - route.reduce((s, c) => s + c.days.min, 0);
     const byScore = [...route].sort((a, b) => score(b, interests) - score(a, interests));
     for (const extra of [0, 3, 30]) {
       let moved = true;
@@ -818,17 +820,18 @@
     let dayNo = 0, fees = 0, food = 0, local = 0, inter = 0, hotel = 0;
     route.forEach((c, ci) => {
       const n = alloc.get(c);
-      const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i })).filter((p) => p.planner !== false)
-        .sort((a, b) => (interests.includes(b.type) ? 1 : 0) - (interests.includes(a.type) ? 1 : 0));
+      const isMust = (p) => (must && must.has(p.key) ? 2 : 0);
+      const pool = c.places.map((p, i) => ({ ...p, key: D.id + ":" + c.id + ":" + i })).filter((p) => p.planner !== false || isMust(p))
+        .sort((a, b) => (isMust(b) + (interests.includes(b.type) ? 1 : 0)) - (isMust(a) + (interests.includes(a.type) ? 1 : 0)));
       const slotsOf = (p) => (p.time.includes("يوم كامل") || p.time === "Full day" ? 2 : 1);
       const tr = ci > 0 ? travel(route[ci - 1], c) : null;
       if (tr) inter += tr.cost[tiers.transport];
       for (let d = 0; d < n; d++) {
         dayNo++;
         const last = dayNo === days;
-        let slots = 2, dayFees = 0;
+        let slots = pace, dayFees = 0;
         const items = [];
-        if (d === 0 && tr) slots = tr.hours > 5 ? 0 : tr.hours > 2.5 ? 1 : 1;
+        if (d === 0 && tr) slots = tr.hours > 5 ? 0 : Math.max(1, pace - 1);
         if (d === 0 && ci === 0) { items.push({ t: T("الوصول والاستقرار في الفندق", "Arrive and check in"), k: "in" }); slots = 1; }
         if (last) slots = Math.min(slots, 1);
         while (slots > 0 && pool.length) {
@@ -838,6 +841,7 @@
           slots -= slotsOf(p);
           fees += p.fee; dayFees += p.fee;
           items.push({ p });
+          if (must && must.has(p.key)) p.must = true;
         }
         if (slots > 0 && !items.length) items.push({ t: T("يوم حر: تسوق وراحة وتجربة أكل محلي", "Free day: shopping, rest and local food"), k: "free" });
         if (last) items.push({ t: T("المغادرة", "Departure"), k: "out" });
@@ -854,7 +858,8 @@
       visa: D.visaSAR * D.currency.perSAR * travelers,
       flights: 0,
     };
-    return { route, alloc, plan, parts, tier: tier || tiers.hotel, tiers, stay, hotelNight };
+    const mustLeft = must ? [...must].filter((k) => route.some((c) => k.startsWith(D.id + ":" + c.id + ":")) && !plan.some((d) => d.items.some((it) => it.p && it.p.key === k))).length : 0;
+    return { route, alloc, plan, parts, tier: tier || tiers.hotel, tiers, stay, hotelNight, days, mustLeft };
   }
   const totalOf = (r, flights, travelers) => Object.values(r.parts).reduce((a, b) => a + b, 0) + (flights ? D.flightSAR * D.currency.perSAR * travelers : 0);
 
@@ -949,6 +954,7 @@
           <span class="tm-gate">${T("صالة المغادرة", "Departures hall")} · ${D.flag} <b>${esc(D.name)}</b></span>
           <h1>${T("رحلتك جاهزة للإقلاع", "Your trip is ready for take-off")}</h1>
           <p class="tm-lead" id="tmLead"></p>
+          <a class="tm-build" href="${B()}/build">🧭 ${T("أو صمّم رحلتك على ذوقك", "Or design your own trip")}</a>
           <div class="lug" id="lugTag"></div>
         </div>
       </section>
@@ -1293,7 +1299,7 @@
           <div class="pday">
             <div class="pday-n"><small>${s.startDate ? niceDate(addDays(s.startDate, d.day - 1)) : T("اليوم", "Day")}</small>${d.day}</div>
             <div class="pday-items">${d.items.map((it) => it.p
-              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${esc(it.p.name)}</b><small>★ ${it.p.rating.toFixed(1)} · ${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
+              ? `<button type="button" class="prow" data-place="${it.p.key}">${photoBox(it.p)}<span class="prow-t"><b>${it.p.must ? `<span class="must-b">❤️ ${T("اخترته", "Your pick")}</span> ` : ""}${esc(it.p.name)}</b><small>★ ${it.p.rating.toFixed(1)} · ${it.p.fee ? money(it.p.fee) : T("مجانًا", "Free")} · ${esc(it.p.time)}</small></span><span class="prow-go" aria-hidden="true">${T("‹", "›")}</span></button>`
               : `<div class="prow note-row"><span class="note-ico">${noteIco(it)}</span><span>${esc(it.t)}</span></div>`).join("")}</div>
           </div>`).join("")}
       </section>`).join("");
@@ -1343,6 +1349,121 @@
     dlg.querySelectorAll(".dc-col").forEach((b) => b.addEventListener("click", () => pick(+b.dataset.dc)));
     pick(0);
     loadPhotos(dlg);
+  }
+
+
+  // ---------- صمّم رحلتك على ذوقك ----------
+  function viewBuild() {
+    const KEY = "build:" + D.id;
+    const gp = getPlan();
+    const b = { cities: [], must: [], pace: 2, interests: [], hotel: "mid", food: "mid", transport: "mid", stay: "hotel", ...store.get(KEY, {}) };
+    b.cities = b.cities.filter((x) => cityById[x.id]);
+    const save = () => store.set(KEY, b);
+    const PACE = [[1, T("🐢 هادئ", "🐢 Relaxed"), T("مكان واحد باليوم", "1 sight a day")], [2, T("🚶 متوازن", "🚶 Balanced"), T("مكانين باليوم", "2 sights a day")], [3, T("🏃 مكثّف", "🏃 Packed"), T("3 أماكن باليوم", "3 sights a day")]];
+    const STAYS = [["hotel", T("🏨 فندق", "🏨 Hotel")], ["apt", T("🏠 شقة Airbnb", "🏠 Airbnb flat")], ["room", T("🛏️ غرفة Airbnb", "🛏️ Airbnb room")]];
+    const seg = (name, cur, opts) => `<div class="seg mini">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>`;
+
+    app.innerHTML = `
+      <section class="bd-hero"><div class="wrap">
+        <div class="kick"><a href="${B()}">${D.flag} ${esc(D.name)}</a></div>
+        <h1 class="display">🧭 ${T("رحلتك على ذوقك", "Your trip, your way")}</h1>
+        <p class="lead">${T("اختر المدن والأيام والأماكن اللي تحبها، وحنا نرتّب لك البرنامج والتكلفة.", "Pick the cities, days and places you love — we'll arrange the plan and the cost.")}</p>
+      </div></section>
+      <div class="wrap bd">
+        <section class="bd-step">
+          <h2><span class="n">1</span>${T("وين تبي تروح؟", "Where do you want to go?")}</h2>
+          <div class="bd-cities" id="bdCities"></div>
+          <div class="bd-route" id="bdRoute"></div>
+        </section>
+        <section class="bd-step" id="bdMustWrap">
+          <h2><span class="n">2</span>${T("أماكن لازم تكون في رحلتك", "Places you can't miss")} <small>${T("اختياري", "optional")}</small></h2>
+          <div id="bdMust"></div>
+        </section>
+        <section class="bd-step">
+          <h2><span class="n">3</span>${T("ذوقك", "Your style")}</h2>
+          <div class="bd-taste" id="bdTaste">
+            <div class="bd-row"><b>${T("وش تحب؟", "What do you enjoy?")}</b><div class="chips">${Object.entries(D.interests).map(([k, v]) => `<label class="chip"><input type="checkbox" name="bi" value="${k}" ${b.interests.includes(k) ? "checked" : ""}><span>${ICONS[k]} ${v}</span></label>`).join("")}</div></div>
+            <div class="bd-row"><b>${T("رتم الرحلة", "Pace")}</b>${seg("bpace", b.pace, PACE.map(([v, l]) => [v, l]))}<small class="hint" id="bdPaceHint"></small></div>
+            <div class="bd-row"><b>${T("🏨 السكن", "🏨 Stay")}</b>${seg("bhotel", b.hotel, TIERS.map((t) => [t, D.tiers[t].name]))}</div>
+            <div class="bd-row"><b>${T("نوع السكن", "Stay type")}</b>${seg("bstay", b.stay, STAYS)}</div>
+            <div class="bd-row"><b>${T("🍽️ الأكل", "🍽️ Food")}</b>${seg("bfood", b.food, TIERS.map((t) => [t, D.tiers[t].name]))}</div>
+            <div class="bd-row"><b>${T("🚕 التنقل", "🚕 Getting around")}</b>${seg("btr", b.transport, TIERS.map((t) => [t, D.tiers[t].name]))}</div>
+          </div>
+        </section>
+      </div>
+      <div class="bd-bar" id="bdBar"></div>`;
+
+    const citiesEl = document.getElementById("bdCities"), routeEl = document.getElementById("bdRoute"), mustEl = document.getElementById("bdMust"), bar = document.getElementById("bdBar");
+    const picked = (id) => b.cities.find((x) => x.id === id);
+    const paintCities = () => {
+      citiesEl.innerHTML = D.cities.map((c) => `<button type="button" class="bd-city ${picked(c.id) ? "on" : ""}" data-c="${c.id}" aria-pressed="${!!picked(c.id)}">
+        <span class="bd-ph">${cityScene(c, true)}<i>${picked(c.id) ? "✓" : "+"}</i></span><b>${esc(c.short || c.name)}</b><small>${T(`${c.places.length} مكان`, `${c.places.length} places`)}</small></button>`).join("");
+      routeEl.innerHTML = b.cities.length ? `
+        <div class="bd-route-h"><b>${T("مسارك", "Your route")}</b>${b.cities.length > 1 ? `<button type="button" class="bd-sort" data-sort>⇅ ${T("رتّبها بأقصر طريق", "Shortest order")}</button>` : ""}</div>
+        ${b.cities.map((x, i) => { const c = cityById[x.id]; return `<div class="bd-leg">
+          <span class="bd-i">${i + 1}</span><span class="bd-nm"><b>${esc(c.short || c.name)}</b><small>${T(`المقترح ${dayWord(c.days.ideal)}`, `suggested ${dayWord(c.days.ideal)}`)}</small></span>
+          <span class="bd-step-d"><button type="button" data-d="${x.id}" data-v="-1" aria-label="${T("أقل", "Fewer")}">−</button><b>${dayWord(x.days)}</b><button type="button" data-d="${x.id}" data-v="1" aria-label="${T("أكثر", "More")}">+</button></span>
+          <span class="bd-mv">${i ? `<button type="button" data-up="${i}" aria-label="${T("قبل", "Earlier")}">▲</button>` : ""}${i < b.cities.length - 1 ? `<button type="button" data-dn="${i}" aria-label="${T("بعد", "Later")}">▼</button>` : ""}</span>
+        </div>`; }).join("")}` : `<p class="hint">${T("اضغط على المدن اللي تبيها، وتقدر تغيّر أيام كل مدينة وترتيبها.", "Tap the cities you want, then adjust the days and order.")}</p>`;
+    };
+    const paintMust = () => {
+      document.getElementById("bdMustWrap").hidden = !b.cities.length;
+      mustEl.innerHTML = b.cities.map((x) => {
+        const c = cityById[x.id];
+        const ps = c.places.map((p, i) => ({ p, key: D.id + ":" + c.id + ":" + i }));
+        const n = ps.filter((q) => b.must.includes(q.key)).length;
+        return `<details class="bd-must" ${n ? "open" : ""}><summary><b>${esc(c.short || c.name)}</b>${n ? `<span class="bd-n">${n} ❤️</span>` : ""}</summary>
+          <div class="chips">${ps.map(({ p, key }) => `<label class="chip"><input type="checkbox" name="bm" value="${key}" ${b.must.includes(key) ? "checked" : ""}><span>${ICONS[p.type] || "📍"} ${esc(p.name)}${p.gem ? " 💎" : ""}</span></label>`).join("")}</div></details>`;
+      }).join("");
+    };
+    let last = null;
+    const compute = () => {
+      const pace = PACE.find((x) => x[0] === +b.pace) || PACE[1];
+      document.getElementById("bdPaceHint").textContent = pace[2];
+      if (!b.cities.length) { last = null; bar.innerHTML = `<div class="bd-bar-in"><span>${T("اختر مدينة وحدة على الأقل", "Pick at least one city")}</span></div>`; return; }
+      const route = b.cities.map((x) => cityById[x.id]);
+      const fixed = Object.fromEntries(b.cities.map((x) => [x.id, x.days]));
+      const s = { ...gp, interests: b.interests };
+      const r = planRoute(route, { ...s, tiers: { hotel: b.hotel, food: b.food, transport: b.transport }, tier: b.hotel, stay: b.stay, hotelNight: hotelNightOf(s), fixed, pace: +b.pace, must: new Set(b.must) });
+      r.total = totalOf(r, gp.flights, gp.travelers);
+      last = { r, s: { ...s, days: r.days, endDate: gp.startDate ? addDays(gp.startDate, r.days - 1) : "" } };
+      const diff = gp.budget - r.total;
+      bar.innerHTML = `<div class="bd-bar-in">
+        <div class="bd-sum"><small>${dayWord(r.days)} · ${paxWord(gp.travelers)} · ${r.route.length === 1 ? T("مدينة وحدة", "1 city") : EN_ON ? r.route.length + " cities" : r.route.length === 2 ? "مدينتين" : r.route.length + " مدن"}</small>
+          <b>${money(r.total)}</b><em class="${diff < 0 ? "neg" : "ok"}">${money(r.total / gp.travelers)} ${T("للشخص", "pp")} · ${diff < 0 ? T(`أكثر من ميزانيتك بـ ${money(-diff)}`, `${money(-diff)} over budget`) : T(`يبقى من ميزانيتك ${money(diff)}`, `${money(diff)} left in budget`)}</em>
+          ${r.mustLeft ? `<em class="neg">${T(`${r.mustLeft} من أماكنك ما وسعتها الأيام، زِد يوم أو خلّ الرتم أسرع`, `${r.mustLeft} of your picks didn't fit — add a day or pick a faster pace`)}</em>` : ""}</div>
+        <button type="button" class="bd-go" id="bdGo">${T("اعرض خطتي ✈", "Show my plan ✈")}</button></div>`;
+      document.getElementById("bdGo").addEventListener("click", () => openOption(last.r, last.s));
+    };
+    const all = () => { save(); paintCities(); paintMust(); compute(); };
+
+    const root = app.querySelector(".bd");
+    root.addEventListener("click", (e) => {
+      const t = e.target.closest("button"); if (!t) return;
+      if (t.dataset.c) {
+        const id = t.dataset.c, i = b.cities.findIndex((x) => x.id === id);
+        if (i >= 0) { b.cities.splice(i, 1); b.must = b.must.filter((k) => !k.startsWith(D.id + ":" + id + ":")); }
+        else b.cities.push({ id, days: cityById[id].days.ideal });
+        all();
+      } else if (t.dataset.d) {
+        const x = picked(t.dataset.d); x.days = Math.max(1, Math.min(14, x.days + +t.dataset.v)); save(); paintCities(); compute();
+      } else if (t.dataset.up || t.dataset.dn) {
+        const i = +(t.dataset.up || t.dataset.dn), j = t.dataset.up ? i - 1 : i + 1;
+        [b.cities[i], b.cities[j]] = [b.cities[j], b.cities[i]]; save(); paintCities(); compute();
+      } else if (t.hasAttribute("data-sort")) {
+        // أقرب جار: نبدأ من أقصى الشمال ونروح للأقرب كل مرة
+        const left = b.cities.map((x) => x), out = [left.sort((a, z) => cityById[z.id].lat - cityById[a.id].lat).shift()];
+        while (left.length) { const cur = cityById[out[out.length - 1].id]; left.sort((a, z) => km(cur, cityById[a.id]) - km(cur, cityById[z.id])); out.push(left.shift()); }
+        b.cities = out; save(); paintCities(); compute();
+      }
+    });
+    root.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t.name === "bm") { b.must = t.checked ? [...new Set([...b.must, t.value])] : b.must.filter((k) => k !== t.value); save(); paintMust(); compute(); }
+      else if (t.name === "bi") { b.interests = [...root.querySelectorAll("input[name=bi]:checked")].map((i) => i.value); save(); compute(); }
+      else if (["bpace", "bhotel", "bfood", "btr", "bstay"].includes(t.name)) { b[{ bpace: "pace", bhotel: "hotel", bfood: "food", btr: "transport", bstay: "stay" }[t.name]] = t.name === "bpace" ? +t.value : t.value; save(); compute(); }
+    });
+    all();
   }
 
   // ---------- الخريطة التفاعلية ----------
@@ -1710,6 +1831,7 @@
       else if (sub === "before") viewBefore();
       else if (sub === "plan") viewPlan(+arg);
       else if (sub === "map") viewMap(arg);
+      else if (sub === "build") viewBuild();
       else viewNotFound();
     } else if (W.continents.some((k) => k.id === parts[0])) { page = "continent"; viewContinent(parts[0]); }
     else viewNotFound();
