@@ -350,7 +350,7 @@
   function ticketForm(id, { amount, unit, days, travelers, go, mode }) {
     return `
       <form class="ticket" id="${id}">
-        <label class="f"><small>${T("الميزانية", "Budget")} (${unit}) ${modeSelect(mode)}</small><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="${T("الميزانية", "Budget")}"></label>
+        <div class="f f-b"><span class="f-top"><small>${T("الميزانية", "Budget")} (${unit})</small>${modeSelect(mode)}</span><input name="b" inputmode="numeric" value="${fmt(amount)}" aria-label="${T("الميزانية", "Budget")}"></div>
         <label class="f"><small>${T("المدة", "Trip length")}</small><select name="d">${selectOpts([3, 4, 5, 7, 10, 14, 21], days, dayWord)}</select></label>
         <label class="f"><small>${T("المسافرين", "Travellers")}</small><select name="t">${selectOpts([1, 2, 3, 4, 5, 6, 8], travelers, paxWord)}</select></label>
         <button class="go" type="submit">${go} ${FWD}</button>
@@ -362,30 +362,70 @@
   const readyIn = (cont) => Object.values(W.countries).filter((c) => c.continent === cont);
   function viewWorld() {
     const st = getPlan();
-    const cards = W.continents.map((k, i) => posterCard({
-      href: k.open ? `#/${k.id}` : "", soon: !k.open, art: scene(k.scene, true), i,
-      title: k.name, left: esc(k.blurb), right: k.open ? T(`${readyIn(k.id).length} دول جاهزة`, `${readyIn(k.id).length} countries ready`) : T("قريبًا", "Coming soon"),
-    })).join("");
+    const ready = Object.values(W.countries);
+    const sar = (v) => (EN_ON ? "SAR " + fmt(v) : fmt(v) + " ريال");
+    // أرخص يوم للشخص في كل دولة (سكن مشترك اقتصادي + أكل + تنقل)
+    const info = ready.map((C) => {
+      const day = Math.min(...C.cities.map((c) => (c.costs.hotel.eco / 2 + c.costs.food.eco + c.costs.transport.eco) / C.currency.perSAR));
+      const has = (k) => C.cities.some((c) => (c.interests[k] || 0) >= 2);
+      return { C, day: Math.max(10, Math.round(day / 5) * 5), free: !C.visaSAR, beach: has("beach"), nature: C.cities.some((c) => (c.interests.nature || 0) >= 3), places: C.cities.reduce((a, c) => a + c.places.length, 0) };
+    }).sort((x, y) => x.day - y.day);
+    const FILTERS = [["all", T("الكل", "All")], ["cheap", T("💸 الأرخص", "💸 Cheapest")], ["free", T("🛂 بدون تأشيرة", "🛂 Visa-free")], ["beach", T("🏖️ بحر", "🏖️ Beaches")], ["nature", T("🏔️ جبال وطبيعة", "🏔️ Mountains & nature")]];
+    const ccard = ({ C, day, free, beach, nature, places }, i) => `
+      <a class="hx-cc" href="#/c/${C.id}" data-free="${free ? 1 : 0}" data-beach="${beach ? 1 : 0}" data-nature="${nature ? 1 : 0}" data-cheap="${i < 8 ? 1 : 0}">
+        <span class="hx-art">${scene(C.scene, true)}${photoOver(cityWiki(C.cities[0]))}<span class="hx-flag">${C.flag}</span>${free ? `<span class="hx-free">${T("بدون تأشيرة", "Visa-free")}</span>` : ""}</span>
+        <span class="hx-cb"><b>${esc(C.name)}</b><small>${esc(C.tagline)}</small>
+          <span class="hx-cm"><em>${T("يومك من", "From")} <strong>${sar(day)}</strong>${T("", " / day")}</em><span>${C.cities.length} ${T("مدن", "cities")} · ${places} ${T("مكان", "places")}</span></span></span>
+      </a>`;
+    const asia = W.continents.find((k) => k.open);
     app.innerHTML = posterHero({
       kick: T("🌏 دليلك العربي للسفر", "🌏 Travel planning that starts with your budget"),
       title: T("ميزانيتك", "Your budget,"), sub: T("توديك وين؟", "where can it take you?"),
-      lead: T("اكتب كم معك، ونطلع لك ملصق لكل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend, and we'll pin up a poster for every country it covers — how many days, what comfort level, and what you'll have left."),
+      lead: T("اكتب كم معك، ونطلع لك كل دولة تكفيها ميزانيتك: كم يوم، وأي مستوى، وكم يبقى معك.", "Tell us what you can spend and we'll show every country it covers — how many days, what comfort level, and what you'll have left."),
       body: ticketForm("worldBudget", { amount: Math.round(st.budgetSAR), unit: T("ريال", "SAR"), days: st.days, travelers: st.travelers, mode: st.budgetMode, go: T("وين تكفيني؟", "Where can I go?") }) +
-        `<button type="button" class="dice-btn hero-dice" data-surprise>🎲 ${T("فاجئني بدولة وخطة", "Surprise me with a country")}</button>` +
-        `<a class="app-chip" href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("حمّل تطبيق الأندرويد", "Get the Android app")}</a>`,
-      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T("آسيا<br>7 دول<br>جاهزة", "Asia<br>7 countries<br>ready") },
+        `<div class="hx-hero-links"><button type="button" class="dice-btn hero-dice" data-surprise>🎲 ${T("فاجئني بدولة وخطة", "Surprise me")}</button>` +
+        `<a class="app-chip" href="https://github.com/1097mbnalll-ui/-Public-/releases/latest/download/rahhal.apk" download>🤖 ${T("تطبيق الأندرويد", "Android app")}</a></div>` +
+        `<div class="hx-proof"><span><b>${ready.length}</b> ${T("دولة جاهزة", "countries")}</span><span><b>${ready.reduce((a, C) => a + C.cities.length, 0)}</b> ${T("مدينة", "cities")}</span><span><b>${info.reduce((a, x) => a + x.places, 0)}</b> ${T("مكان مع صور", "places")}</span></div>`,
+      poster: { art: scene("balloons", true), wiki: "Cappadocia", title: T("كبادوكيا", "Cappadocia"), caption: T("🇹🇷 تركيا · بالونات الشروق", "🇹🇷 Türkiye · sunrise balloons"), stamp: T(`آسيا<br>${ready.length} دولة<br>جاهزة`, `Asia<br>${ready.length}<br>countries`) },
     }) + `
-      <div class="wrap">
-        <section class="band">
-          <div class="band-head"><div><h2 class="display">${T("اختر قارتك", "Pick a continent")}</h2><p>${T("بدأنا بآسيا، والقارات الباقية جاية.", "We've started with Asia — the rest of the world is on its way.")}</p></div></div>
-          <div class="posters">${cards}</div>
-        </section>
+      <div class="hx">
+        <div class="wrap">
+          <section class="hx-sec">
+            <div class="hx-head"><div><h2>${T("وجهات جاهزة لك", "Ready to explore")}</h2><p>${T("مرتبة من الأرخص. اضغط على أي دولة وشوف مدنها وأسعارها وبرامجها.", "Sorted from the cheapest. Tap a country for its cities, prices and plans.")}</p></div>
+              <a class="hx-all" href="#/asia">${T("قارن بميزانيتك", "Compare with your budget")} ›</a></div>
+            <div class="hx-filters" role="tablist">${FILTERS.map(([k, l], i) => `<button type="button" class="${i ? "" : "on"}" data-f="${k}">${l}</button>`).join("")}</div>
+            <div class="hx-grid" id="hxGrid">${info.map(ccard).join("")}</div>
+          </section>
+
+          <section class="hx-sec hx-how">
+            <h2>${T("كيف يشتغل رحّال؟", "How it works")}</h2>
+            <div class="hx-steps">
+              <div><span>1</span><b>${T("اكتب ميزانيتك", "Enter your budget")}</b><p>${T("للمجموعة أو للشخص، مع المدة وعدد المسافرين.", "For the group or per person, with days and travellers.")}</p></div>
+              <div><span>2</span><b>${T("اختر من الخيارات", "Pick an option")}</b><p>${T("عشرات المسارات المرتبة، أو صمّم رحلتك على ذوقك.", "Dozens of ranked routes — or design your own trip.")}</p></div>
+              <div><span>3</span><b>${T("استلم برنامجك", "Get your plan")}</b><p>${T("يوم بيوم، مع مصروف كل يوم وروابط الحجز بتواريخك.", "Day by day, with daily spending and booking links for your dates.")}</p></div>
+            </div>
+          </section>
+
+          <section class="hx-sec">
+            <h2>${T("القارات", "Continents")}</h2>
+            <div class="hx-conts">
+              <a class="hx-asia" href="#/${asia.id}"><span class="hx-art">${scene(asia.scene, true)}</span><span class="hx-ab"><b>${esc(asia.name)}</b><small>${esc(asia.blurb)}</small><em>${T(`${ready.length} دولة جاهزة ›`, `${ready.length} countries ready ›`)}</em></span></a>
+              <div class="hx-soon">${W.continents.filter((k) => !k.open).map((k) => `<div><span class="hx-art">${scene(k.scene, true)}</span><b>${esc(k.name)}</b><small>${T("قريبًا", "Coming soon")}</small></div>`).join("")}</div>
+            </div>
+          </section>
+        </div>
       </div>`;
     document.getElementById("worldBudget").addEventListener("submit", (e) => {
       e.preventDefault();
       const t = readTicket(e.target);
       store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = "#/asia";
+    });
+    const grid = document.getElementById("hxGrid");
+    app.querySelector(".hx-filters").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-f]"); if (!b) return;
+      app.querySelectorAll(".hx-filters button").forEach((x) => x.classList.toggle("on", x === b));
+      grid.querySelectorAll(".hx-cc").forEach((x) => { x.hidden = b.dataset.f !== "all" && x.dataset[b.dataset.f] !== "1"; });
     });
     loadPhotos(app);
   }
