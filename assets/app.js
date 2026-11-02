@@ -519,7 +519,7 @@
       <div class="wrap">
         <section class="band" id="cities">
           <div class="band-head"><div><h2 class="display">${T("الوجهات", "Destinations")}</h2><p>${T("اضغط على أي ملصق وشوف أماكنه وأسعاره.", "Tap a poster to see its places and prices.")}</p></div></div>
-          <div class="posters">${cards}</div>
+          <div class="posters rail">${cards}</div>
         </section>
 
         ${allPlaces.some((p) => p.gem) ? `
@@ -527,7 +527,7 @@
           <div class="band-head">
             <div><h2 class="display">💎 ${T("جواهر ما يعرفها السياح", "Hidden gems")}</h2><p>${T("أماكن رائعة وموثّقة، لكن أغلب الزوار يفوّتونها.", "Wonderful, well-loved places that most visitors miss.")}</p></div>
           </div>
-          <div class="pgrid">${allPlaces.filter((p) => p.gem).map((p) => placeCard(p, { showCity: true })).join("")}</div>
+          <div class="pgrid rail">${allPlaces.filter((p) => p.gem).map((p) => placeCard(p, { showCity: true })).join("")}</div>
         </section>` : ""}
 
         <section class="band">
@@ -535,7 +535,7 @@
             <div><h2 class="display">${T("أماكن لازم تشوفها", "Don't miss")}</h2><p>${T("اضغط على أي مكان وشوف صورته وتفاصيله.", "Tap any place for photos and details.")}</p></div>
             <a class="btn ghost" href="${B()}/places">${T("كل الأماكن", "All places")} (${allPlaces.length})</a>
           </div>
-          <div class="pgrid">${picks.map((p) => placeCard(p, { showCity: true })).join("")}</div>
+          <div class="pgrid rail">${picks.map((p) => placeCard(p, { showCity: true })).join("")}</div>
         </section>
 
         <section class="band">
@@ -567,7 +567,7 @@
       [T("غرفة خاصة في Airbnb (لليلة) — تقدير", "Private Airbnb room (per night) — est."), Object.fromEntries(TIERS.map((t) => [t, Math.round(c.costs.hotel[t] * STAY.room)]))],
       [T("الأكل (للشخص في اليوم)", "Food (per person per day)"), c.costs.food],
       [T("التنقل داخل المدينة (للشخص في اليوم)", "Getting around (per person per day)"), c.costs.transport],
-    ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num">${v[t] ? money2(v[t]) : `<span class='sub'>${T("مشمول", "Included")}</span>`}</td>`).join("")}</tr>`).join("");
+    ].map(([label, v]) => `<tr><td>${label}</td>${TIERS.map((t) => `<td class="num" data-l="${esc(D.tiers[t].name)}">${v[t] ? money2(v[t]) : `<span class='sub'>${T("مشمول", "Included")}</span>`}</td>`).join("")}</tr>`).join("");
 
     const places = c.places.map((p, i) => placeCard({ ...p, city: c, key: D.id + ":" + c.id + ":" + i })).join("");
     const areas = c.stayAreas.map((a) => `<div class="area"><h3>${esc(a.name)}</h3><p>${esc(a.desc)}</p></div>`).join("");
@@ -575,7 +575,7 @@
       ? `<ul class="clean">${c.halal.mosques.map((m) => `<li><b>${esc(m.name)}:</b> ${esc(m.note)}</li>`).join("")}</ul>`
       : `<p>${T("ما فيه مساجد معروفة قريبة للسياح.", "No well-known mosques near the tourist areas.")}</p>`;
     const near = D.cities.filter((o) => o !== c).map((o) => ({ o, t: travel(c, o) })).sort((a, b) => a.t.hours - b.t.hours).slice(0, 6)
-      .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td>${esc(t.mode)}</td><td>${hoursText(t.hours)}</td><td class="num">${money2(t.cost.eco)}</td></tr>`).join("");
+      .map(({ o, t }) => `<tr><td><a href="${B()}/city/${o.id}">${esc(o.name)}</a></td><td data-l="${T("الطريقة", "How")}">${esc(t.mode)}</td><td data-l="${T("المدة", "Time")}">${hoursText(t.hours)}</td><td class="num" data-l="${T("من (للشخص)", "From (pp)")}">${money2(t.cost.eco)}</td></tr>`).join("");
 
     app.innerHTML = `
       ${posterHero({
@@ -595,7 +595,7 @@
 
           <section class="block">
             <h2>${T("كم بتصرف؟", "What it costs")}</h2>
-            <div class="table-wrap"><table>
+            <div class="table-wrap"><table class="cost-t">
               <thead><tr><th></th>${TIERS.map((t) => `<th>${D.tiers[t].name}</th>`).join("")}</tr></thead>
               <tbody>${tierRows}</tbody>
             </table></div>
@@ -617,7 +617,7 @@
             <h2>${T("التنقل", "Getting around")}</h2>
             <ul class="clean">${c.transport.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
             <h3 style="margin-top:22px">${T(`أقرب الوجهات من ${esc(c.name)}`, `Nearest stops from ${esc(c.name)}`)}</h3>
-            <div class="table-wrap"><table>
+            <div class="table-wrap"><table class="near-t">
               <thead><tr><th>${T("إلى", "To")}</th><th>${T("الطريقة", "How")}</th><th>${T("المدة", "Time")}</th><th>${T("من (للشخص)", "From (per person)")}</th></tr></thead>
               <tbody>${near}</tbody>
             </table></div>
@@ -660,8 +660,9 @@
         </div>
         <p class="count-line" id="fcount"></p>
         <div class="pgrid" id="plist"></div>
+        <button type="button" class="dp-more" id="pmore" hidden></button>
       </div>`;
-    const list = document.getElementById("plist");
+    const list = document.getElementById("plist"), moreBtn = document.getElementById("pmore");
     const apply = () => {
       const st = {
         q: document.getElementById("fq").value.trim(),
@@ -680,8 +681,18 @@
         (!st.q || (p.name + p.desc + p.city.name).includes(st.q)));
       document.getElementById("fcount").textContent = res.length ? `${res.length} ${T("مكان", "places")}` : T("ما لقينا أماكن بهالفلتر. جرّب تشيل بعض الخيارات.", "Nothing matches these filters. Try removing a few.");
       if (st.sort) res.sort((a, b) => b.rating - a.rating);
-      list.innerHTML = res.map((p) => placeCard(p, { showCity: !st.city })).join("");
-      loadPhotos(list);
+      let shown = 0;
+      const more = () => {
+        const next = res.slice(shown, shown + 24);
+        list.insertAdjacentHTML("beforeend", next.map((p) => placeCard(p, { showCity: !st.city })).join(""));
+        shown += next.length;
+        moreBtn.hidden = shown >= res.length;
+        moreBtn.textContent = T(`عرض المزيد (${res.length - shown})`, `Show more (${res.length - shown})`);
+        loadPhotos(list);
+      };
+      list.innerHTML = "";
+      moreBtn.onclick = more;
+      more();
     };
     app.querySelector(".filters").addEventListener("input", apply);
     app.querySelector(".filters").addEventListener("change", apply);
@@ -1728,7 +1739,8 @@
       <a href="#/" data-route="world" aria-label="${T("القارات", "Continents")}"><i>🌍</i>${T("الوجهات", "Explore")}</a>
       ${C ? `<a href="${base}" data-route="country" aria-label="${esc(C.name)}"><i>${C.flag}</i>${esc(C.name)}</a>` : ""}
       ${C && window.MAPS && window.MAPS[C.id] ? `<a href="${base}/map" data-route="map"><i>🗺️</i>${T("الخريطة", "Map")}</a>` : ""}
-      ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>${T("ميزانيتي", "Budget")}</a><a href="${base}/places" data-route="places"><i>📍</i>${T("الأماكن", "Places")}</a><a href="${base}/before" data-route="before"><i>🧳</i>${T("قبل السفر", "Prep")}</a>` : ""}`;
+      ${C ? `<a href="${base}/plan" data-route="plan"><i>🎫</i>${T("ميزانيتي", "Budget")}</a><a href="${base}/places" data-route="places"><i>📍</i>${T("الأماكن", "Places")}</a><a href="${base}/before" data-route="before" class="nav-2nd"><i>🧳</i>${T("قبل السفر", "Prep")}</a>` : ""}`;
+    document.body.classList.toggle("nav-solo", !C);
     nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.route === page || (page === "city" && a.dataset.route === "country") || (page === "continent" && a.dataset.route === "world")));
     const loc = curBox.querySelector('[data-cur="LOCAL"]');
     loc.textContent = C ? C.currency.name : T("محلي", "Local");
