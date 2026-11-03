@@ -1115,10 +1115,10 @@
       if (!ok.length) { if (cheapest) over.push(cheapest); continue; }
       // لكل مسار: أفخم تركيبة تكفيها الميزانية، ونسخة متوسطة، ونسخة اقتصادية (إذا تختلف)
       ok.sort((x, y) => y.comfort - x.comfort || y.total - x.total);
+      // لكل مسار: أفخم تركيبة تكفيها الميزانية، ونسخة فاخرة كاملة، ومتوسطة كاملة، واقتصادية كاملة (إذا تكفي)
       const keep = [ok[0]];
-      const mid = ok.find((r) => r.tiers.hotel === "mid" && r.tiers.food === "mid");
-      const eco = ok.find((r) => r.tiers.hotel === "eco" && r.tiers.food === "eco" && r.tiers.transport === "eco");
-      [mid, eco].forEach((r) => { if (r && !keep.includes(r)) keep.push(r); });
+      const pure = (lvl) => ok.filter((r) => PREF_KEYS.every((k) => r.tiers[k] === lvl)).sort((a, b) => b.total - a.total)[0];
+      ["lux", "mid", "eco"].forEach((lvl) => { const r = pure(lvl); if (r && !keep.includes(r)) keep.push(r); });
       fits.push(...keep);
     }
     // الترتيب: كم تستفيد من ميزانيتك (فخامة أعلى وأقرب للحد الأقصى) + مدى مناسبة المدن لذوقك
@@ -1356,6 +1356,8 @@
   const apCode = (c) => c.code || (c.en || c.id).replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase();
   const hopText = (t) => (t.flight ? "✈ " : "🚐 ") + (t.hours < 1 ? T(`${Math.max(15, Math.round(t.hours * 60 / 5) * 5)} د`, `${Math.max(15, Math.round(t.hours * 60 / 5) * 5)} min`) : T(`${Math.round(t.hours)} س`, `${Math.round(t.hours)} h`));
   const tierRank = { eco: 0, mid: 1, lux: 2 };
+  // المستوى الغالب في الرحلة (أو المتوسط إذا تساوت البنود)
+  const domTier = (r) => { const c = { eco: 0, mid: 0, lux: 0 }; PREF_KEYS.forEach((k) => c[r.tiers[k]]++); return c.lux > c.mid && c.lux > c.eco ? "lux" : c.eco > c.mid && c.eco > c.lux ? "eco" : "mid"; };
   function renderOptions(s) {
     const { fits, over } = buildOptions(s);
     const list = fits.length ? fits : over.slice(0, 5);
@@ -1407,7 +1409,7 @@
     // الفلاتر والترتيب
     const nStops = (r) => Math.min(3, r.route.length);
     const cnt = (k) => list.filter((r) => k === "all" || nStops(r) === +k).length;
-    let view = list.filter((r) => (optUI.stops === "all" || nStops(r) === +optUI.stops) && (optUI.tier === "all" || r.tier === optUI.tier));
+    let view = list.filter((r) => (optUI.stops === "all" || nStops(r) === +optUI.stops) && (optUI.tier === "all" || domTier(r) === optUI.tier));
     if (optUI.sort === "cheap") view = [...view].sort((a, b) => a.total - b.total);
     else if (optUI.sort === "lux") view = [...view].sort((a, b) => b.total - a.total);
     const arc = `<svg viewBox="0 0 100 58" preserveAspectRatio="none" aria-hidden="true"><path d="M0,29 Q50,-2 100,29" fill="none" stroke="#0f3d3e" stroke-width="1.6" stroke-dasharray="3 4" vector-effect="non-scaling-stroke" opacity=".55"/></svg>`;
