@@ -383,5 +383,50 @@
     return svg(id, body, defs, "بالونات فوق مداخن الجنيات");
   }
 
-  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc, terraces, dunes, domes, balloons };
+
+  // ---------- براغ: القلعة والكاتدرائية وجسر تشارلز ----------
+  function prague() {
+    const id = uid();
+    const defs =
+      grad(id + "-sky", [[0, "#24345e"], [0.5, "#8a5a86"], [0.82, "#f19a6a"], [1, "#ffd59a"]]) +
+      grad(id + "-river", [[0, "#3c3f6e"], [1, "#16183a"]]) +
+      grad(id + "-hill", [[0, "#3b3a5e"], [1, "#24233f"]]);
+    const spire = (x, base, w, h, col) => `<rect x="${x - w / 2}" y="${base - h * 0.62}" width="${w}" height="${h * 0.62}" fill="${col}"/><path d="M${x - w / 2 - 2},${base - h * 0.62} L${x},${base - h} L${x + w / 2 + 2},${base - h * 0.62} Z" fill="${col}"/><rect x="${x - 0.8}" y="${base - h - 8}" width="1.6" height="9" fill="${col}"/>`;
+    // الكاتدرائية: صحن طويل وبرجين أماميين وبرج كبير
+    const cathedral = (x, base, col) => `
+      <rect x="${x - 70}" y="${base - 46}" width="140" height="46" fill="${col}"/>
+      <path d="M${x - 70},${base - 46} L${x},${base - 70} L${x + 70},${base - 46} Z" fill="${col}"/>
+      ${spire(x - 58, base, 16, 132, col)}${spire(x - 34, base, 16, 132, col)}${spire(x + 40, base, 22, 112, col)}
+      <circle cx="${x - 46}" cy="${base - 30}" r="7" fill="#ffcf8a" opacity=".55"/>`;
+    // القلعة: مبنى طويل بنوافذ مضيئة
+    let castle = `<rect x="70" y="214" width="250" height="40" fill="#2c2b4c"/>`;
+    for (let i = 0; i < 18; i++) castle += `<rect x="${80 + i * 13}" y="${222 + (i % 2) * 14}" width="5" height="7" fill="#ffd08a" opacity="${0.35 + (i % 3) * 0.2}"/>`;
+    // بيوت بأسقف حمراء
+    const r = rng(11);
+    let roofs = "";
+    for (let x = 300; x < 800; ) { const w = 22 + r() * 28, h = 16 + r() * 22, b = 318; roofs += `<rect x="${x}" y="${b - h}" width="${w}" height="${h}" fill="#4a3c62"/><path d="M${x - 2},${b - h} L${x + w / 2},${b - h - w * 0.45} L${x + w + 2},${b - h} Z" fill="#b4513a"/>`; if (r() > 0.55) roofs += `<rect x="${x + w * 0.3}" y="${b - h + 6}" width="4" height="5" fill="#ffd08a" opacity=".7"/>`; x += w + 1; }
+    roofs += spire(520, 318, 12, 92, "#3a3156") + spire(540, 318, 12, 92, "#3a3156") + spire(690, 318, 14, 74, "#3a3156");
+    // جسر تشارلز: أقواس وتماثيل وبرج البوابة
+    let bridge = `<rect x="0" y="336" width="800" height="12" fill="#2a2440"/>`;
+    for (let i = 0; i < 9; i++) bridge += `<path d="M${i * 92 - 10},372 Q${i * 92 + 36},334 ${i * 92 + 82},372 Z" fill="url(#${id}-river)"/>`;
+    for (let i = 0; i < 16; i++) bridge += `<rect x="${20 + i * 50}" y="322" width="4" height="14" fill="#2a2440"/><circle cx="${22 + i * 50}" cy="319" r="3.5" fill="#2a2440"/>`;
+    bridge += `<rect x="700" y="276" width="44" height="62" fill="#2a2440"/><path d="M698,276 L722,240 L746,276 Z" fill="#2a2440"/><rect x="714" y="306" width="16" height="30" rx="8" fill="#ffcf8a" opacity=".35"/>`;
+    for (let i = 0; i < 10; i++) bridge += `<circle cx="${40 + i * 70}" cy="330" r="2.2" fill="#ffd9a0"/><circle cx="${40 + i * 70}" cy="330" r="7" fill="#ffd9a0" opacity=".25" filter="url(#${id}-glow)"/>`;
+    const refl = [0, 1, 2, 3].map((i) => `<rect x="${170 - i * 6}" y="${386 + i * 14}" width="${120 + i * 12}" height="3" rx="1.5" fill="#ffcf8a" opacity="${0.5 - i * 0.1}"/>`).join("");
+    const body = `
+      <rect width="800" height="450" fill="url(#${id}-sky)"/>
+      <circle cx="610" cy="200" r="70" fill="#ffd9a0" opacity="0.4" filter="url(#${id}-glow)"/>
+      <circle cx="610" cy="200" r="30" fill="#ffe3b6"/>
+      ${birds("#3b2450")}
+      ${clouds(id, "#ffd6c0", [[150, 70, 1.1, 80], [520, 110, 0.8, 70]])}
+      <g data-depth="0.05"><path d="M0,270 Q90,214 210,218 Q330,222 420,268 L420,330 L0,330 Z" fill="url(#${id}-hill)"/></g>
+      <g data-depth="0.08">${castle}${cathedral(205, 214, "#28264a")}</g>
+      <g data-depth="0.12">${roofs}</g>
+      <rect y="336" width="800" height="114" fill="url(#${id}-river)"/>
+      ${refl}
+      <g data-depth="0.2">${bridge}</g>`;
+    return svg(id, body, defs, "قلعة براغ وجسر تشارلز وقت الغروب");
+  }
+
+  window.SCENES = { halong, hanoi, danang, hcmc, phuquoc, terraces, dunes, domes, balloons, prague };
 })();

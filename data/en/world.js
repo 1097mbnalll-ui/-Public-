@@ -7,6 +7,7 @@
     africa: ["Africa", "Safaris, deserts and beaches"], namerica: ["North America", "Giant cities and national parks"],
     samerica: ["South America", "The Amazon and the Andes"], oceania: ["Oceania", "Australia, New Zealand and the islands"],
   };
+  EN.europe = { czechia: "Czechia", bosnia: "Bosnia & Herzegovina", albania: "Albania", montenegro: "Montenegro", austria: "Austria", hungary: "Hungary", poland: "Poland", switzerland: "Switzerland" };
   EN.asia = {
     turkey: "Türkiye", malaysia: "Malaysia", indonesia: "Indonesia", thailand: "Thailand", vietnam: "Vietnam", georgia: "Georgia", azerbaijan: "Azerbaijan",
     maldives: "Maldives", japan: "Japan", southkorea: "South Korea", china: "China", singapore: "Singapore", philippines: "Philippines", srilanka: "Sri Lanka",
@@ -35,6 +36,7 @@
   window.applyEnglish = function () {
     W.continents.forEach((k) => { const e = EN.continents[k.id]; if (e) { k.name = e[0]; k.blurb = e[1]; } });
     W.asia.forEach((c) => { if (EN.asia[c.id]) c.name = EN.asia[c.id]; });
+    (W.europe || []).forEach((c) => { if (EN.europe[c.id]) c.name = EN.europe[c.id]; });
     Object.entries(EN.tiers).forEach(([k, v]) => { W.tiers[k].name = v[0]; W.tiers[k].desc = v[1]; });
     Object.assign(W.interests, EN.interests);
     Object.entries(EN.sources).forEach(([k, v]) => { if (W.sources[k]) W.sources[k].name = v; });

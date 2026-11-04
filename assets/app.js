@@ -360,6 +360,8 @@
 
   // ---------- الصفحة الرئيسية: القارات ----------
   const readyIn = (cont) => Object.values(W.countries).filter((c) => c.continent === cont);
+  const contName = (id) => (W.continents.find((k) => k.id === id) || { name: id }).name;
+  const enCountry = (id) => { const E = window.EN_DATA || {}; return (E.asia && E.asia[id]) || (E.europe && E.europe[id]) || ""; };
   function viewWorld() {
     const st = getPlan();
     const ready = Object.values(W.countries);
@@ -383,7 +385,7 @@
       for (let lo = 30; lo <= 140; lo += 10) { const [x1, y1] = PJ(56, lo), [x2, y2] = PJ(-11, lo); grat += `M${x1.toFixed(0)} ${y1.toFixed(0)}L${x2.toFixed(0)} ${y2.toFixed(0)}`; }
       for (let la = -10; la <= 50; la += 10) { const [x1, y1] = PJ(la, 24), [x2, y2] = PJ(la, 146); grat += `M${x1.toFixed(0)} ${y1.toFixed(0)}L${x2.toFixed(0)} ${y2.toFixed(0)}`; }
       const show = new Set([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
-      const pins = info.map((x, i) => {
+      const pins = info.filter((x) => A.ctry[x.C.id]).map((x, i) => {
         const [px, py] = PJ(x.cap.lat, x.cap.lon), mx = (R[0] + px) / 2, my = (R[1] + py) / 2 - Math.hypot(px - R[0], py - R[1]) * 0.22;
         return { x, i, px, py, arc: `<path class="at-route aa-arc" style="--d:${(i * 0.08).toFixed(2)}s" d="M${R[0].toFixed(0)} ${R[1].toFixed(0)}Q${mx.toFixed(0)} ${my.toFixed(0)} ${px.toFixed(0)} ${py.toFixed(0)}"/>` };
       });
@@ -412,10 +414,10 @@
       </a>`;
     const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
     const plates = W.continents.map((k, i) => `
-      <${k.open ? `a href="#/${k.id}"` : "div"} class="ac-plate ${k.open ? "big" : "soon"}">
+      <${k.open ? `a href="#/${k.id}"` : "div"} class="ac-plate ${k.open ? (i ? "open" : "big") : "soon"}">
         <span class="ac-art">${scene(k.scene, true)}</span><span class="ac-no">PLATE ${ROMAN[i]}</span>
         ${k.open ? "" : `<span class="at-stamp ac-soon">${T("قريبًا", "Soon")}</span>`}
-        <span class="ac-lab"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small>${k.open ? `<em>${T(`${ready.length} دولة جاهزة ←`, `${ready.length} countries ready →`)}</em>` : ""}</span>
+        <span class="ac-lab"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small>${k.open ? `<em>${T(`${readyIn(k.id).length} ${readyIn(k.id).length === 1 ? "دولة" : "دولة"} جاهزة ←`, `${readyIn(k.id).length} ${readyIn(k.id).length === 1 ? "country" : "countries"} ready →`)}</em>` : ""}</span>
       </${k.open ? "a" : "div"}>`).join("");
 
     app.innerHTML = `
@@ -442,7 +444,7 @@
 
       <div class="wrap">
         <section class="at-sec">
-          <div class="at-h"><div><span class="at-kicker">${T("الفصل الأول", "Chapter one")}</span><h2>${T("تصفّح الأطلس", "Browse the atlas")}</h2><p>${T("كل قارة لوحة في الأطلس. بدأنا بآسيا، والباقي نرسمه الحين.", "Each continent is a plate in the atlas. Asia is ready; the rest are on the drawing board.")}</p></div></div>
+          <div class="at-h"><div><span class="at-kicker">${T("الفصل الأول", "Chapter one")}</span><h2>${T("تصفّح الأطلس", "Browse the atlas")}</h2><p>${T("كل قارة لوحة في الأطلس. آسيا جاهزة، وبدأنا أوروبا بالتشيك، والباقي نرسمه الحين.", "Each continent is a plate in the atlas. Asia is ready, Europe has begun with Czechia, and the rest are on the drawing board.")}</p></div></div>
           <div class="ac-grid">${plates}</div>
         </section>
 
@@ -510,7 +512,7 @@
         <div class="page-title">
           <div class="kick"><a href="#/">${T("القارات", "Continents")}</a> ${T("‹", "›")} ${esc(k.name)}</div>
           <h1 class="display">${EN_ON ? `${esc(k.name)} <span class="gold">awaits</span>` : `${esc(k.name)} <span class="gold">بانتظارك</span>`}</h1>
-          <p class="lead">${T(`${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.`, `${list.length} non-Arab countries. ${readyIn(cid).length} are fully covered, with more added all the time.`)}</p>
+          <p class="lead">${cid === "asia" ? T(`${list.length} دولة غير عربية. ${readyIn(cid).length} منها جاهزة بالكامل، والباقي نضيفها تباعًا.`, `${list.length} non-Arab countries. ${readyIn(cid).length} are fully covered, with more added all the time.`) : T(`${list.length} دول في القائمة، ${readyIn(cid).length === 1 ? "وحدة منها جاهزة" : readyIn(cid).length + " منها جاهزة"} بالكامل، والباقي نضيفها تباعًا.`, `${list.length} countries listed; ${readyIn(cid).length} fully covered, with more on the way.`)}</p>
         </div>
         ${passportPicker()}
         <form class="fit-form" id="fitForm" onsubmit="return false">
@@ -579,7 +581,7 @@
     const cap = D.cities.find((c) => M && c.id === (M.main || M.capital)) || D.cities[0];
     const day = Math.max(10, Math.round(Math.min(...D.cities.map((c) => (c.costs.hotel.eco / 2 + c.costs.food.eco + c.costs.transport.eco) / D.currency.perSAR)) / 5) * 5);
     const best = (cap.bestTime || "").split(/[.،:]/)[0];
-    const ISO = { vietnam: "VNM", thailand: "THA", malaysia: "MYS", indonesia: "IDN", turkey: "TUR", japan: "JPN", southkorea: "KOR", srilanka: "LKA", singapore: "SGP", georgia: "GEO", azerbaijan: "AZE", kyrgyzstan: "KGZ", uzbekistan: "UZB", kazakhstan: "KAZ", laos: "LAO", cambodia: "KHM", nepal: "NPL", armenia: "ARM", tajikistan: "TJK" };
+    const ISO = { czechia: "CZE", vietnam: "VNM", thailand: "THA", malaysia: "MYS", indonesia: "IDN", turkey: "TUR", japan: "JPN", southkorea: "KOR", srilanka: "LKA", singapore: "SGP", georgia: "GEO", azerbaijan: "AZE", kyrgyzstan: "KGZ", uzbekistan: "UZB", kazakhstan: "KAZ", laos: "LAO", cambodia: "KHM", nepal: "NPL", armenia: "ARM", tajikistan: "TJK" };
     const code = ISO[D.id] || D.id.slice(0, 3).toUpperCase();
     const vol = String(Object.keys(W.countries).indexOf(D.id) + 1).padStart(2, "0");
     const gems = allPlaces.filter((p) => p.gem);
@@ -600,7 +602,7 @@
     app.innerHTML = `
       <section class="ag-cover">
         <div class="ag-bg">${cityScene(cap, true)}${photoOver(cityWiki(cap))}</div>
-        <nav class="ag-crumb"><a href="#/">${T("الأطلس", "Atlas")}</a> ‹ <a href="#/${D.continent}">${T("آسيا", "Asia")}</a> ‹ <b>${esc(D.name)}</b></nav>
+        <nav class="ag-crumb"><a href="#/">${T("الأطلس", "Atlas")}</a> ‹ <a href="#/${D.continent}">${esc(contName(D.continent))}</a> ‹ <b>${esc(D.name)}</b></nav>
         <span class="ag-vol at-mono">GUIDE · VOL. ${vol} · ${esc(code)}</span>
         <span class="at-stamp ag-stamp">${esc(code)}<b>${esc(D.name)}</b>${D.flag} 2026</span>
         <div class="ag-cv"><span class="at-kicker">${T("دليل رحّال للسفر", "The Rahhal travel guide")}</span><h1>${esc(D.name)}</h1><p>${esc(D.tagline)}</p></div>
@@ -716,7 +718,7 @@
       <section class="cx-hero">
         <div class="cx-bg">${cityScene(c, true)}${photoOver(cityWiki(c))}</div><div class="cx-shade"></div>
         <div class="wrap cx-hero-in">
-          <nav class="cx-crumb" aria-label="${T("المسار", "Breadcrumb")}"><a href="#/${D.continent}">${T("آسيا", "Asia")}</a><i>›</i><a href="${B()}">${D.flag} ${esc(D.name)}</a><i>›</i><span>${esc(c.short || c.name)}</span></nav>
+          <nav class="cx-crumb" aria-label="${T("المسار", "Breadcrumb")}"><a href="#/${D.continent}">${esc(contName(D.continent))}</a><i>›</i><a href="${B()}">${D.flag} ${esc(D.name)}</a><i>›</i><span>${esc(c.short || c.name)}</span></nav>
           <h1>${esc(c.name)}</h1>
           <p class="cx-lead">${esc(c.summary)}</p>
           <div class="cx-stats">
@@ -979,7 +981,7 @@
   const tripDays = (a, b) => { const x = parseDate(a), y = parseDate(b); return x && y && y >= x ? Math.round((y - x) / 864e5) + 1 : 0; };
 
   function bookingLinks(c, travelers, checkin, checkout) {
-    const ce = (window.EN_DATA && window.EN_DATA.asia && window.EN_DATA.asia[D.id]) || "";
+    const ce = enCountry(D.id);
     const q = cityWiki(c) + (ce ? ", " + ce : "");
     const dates = checkin && checkout && checkout > checkin;
     const b = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}&group_adults=${travelers}&no_rooms=${Math.ceil(travelers / 2)}${dates ? `&checkin=${checkin}&checkout=${checkout}` : ""}`;
@@ -2003,7 +2005,7 @@
         const nearCheaper = items.filter((x) => x.id !== d.id && x.d.walk <= 15 && x.v < it.v).sort((a, b) => a.v - b.v)[0];
         const tip = nearCheaper ? T(`<b>وفّر ${Math.round((1 - nearCheaper.v / it.v) * 100)}%:</b> اسكن في ${esc(nearCheaper.name)} (${money(nearCheaper.v)}) وتوصل الحي القديم في ${nearCheaper.d.walk} دقيقة.`, `<b>Save ${Math.round((1 - nearCheaper.v / it.v) * 100)}%:</b> stay in ${esc(nearCheaper.name)} (${money(nearCheaper.v)}) and reach the Old Quarter in ${nearCheaper.d.walk} min.`) : diffTxt + T(" في المدينة.", " in the city.");
         const byWalk = [...items].sort((a, b) => a.d.walk - b.d.walk).map((x) => x.v);
-        const q = `${d.name[1]}, ${cityWiki(city)}, ${(window.EN_DATA && window.EN_DATA.asia[D.id]) || ""}`;
+        const q = `${d.name[1]}, ${cityWiki(city)}, ${enCountry(D.id)}`;
         const gp = getPlan();
         const dates = gp.startDate && gp.endDate ? `&checkin=${gp.startDate}&checkout=${gp.endDate}` : "";
         sheet.innerHTML = `

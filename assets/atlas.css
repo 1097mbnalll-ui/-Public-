@@ -459,3 +459,12 @@ body.page-city .currency button.on, body.page-plan .currency button.on { backgro
 .cx-sec h2 { font-family: var(--serif-d); font-weight: 900; color: var(--ink0); }
 .cx-day > div { background: var(--night); }
 .at-h > * { min-width: 0; max-width: 100%; } .at-chips { max-width: 100%; }
+.ac-plate.open { transition: transform .2s; } .ac-plate.open:hover { transform: translateY(-3px); }
+.ac-grid { grid-template-rows: none; grid-auto-rows: 200px; }
+.ac-grid > .ac-plate:last-child:nth-child(even) { grid-column: 1 / -1; height: 150px; }
+@media (max-width: 900px) {
+  .ac-grid { grid-auto-rows: auto; }
+  .ac-plate { height: 140px; } .ac-plate.big { height: 210px; }
+  .ac-plate:not(.big) .ac-lab small { display: none; }
+  .ac-grid > .ac-plate:last-child:nth-child(even) { height: 120px; }
+}

@@ -9,11 +9,23 @@
   window.WORLD = {
     continents: [
       { id: "asia", name: "آسيا", scene: "halong", blurb: "من جزر الملايو لجبال القوقاز", open: true },
-      { id: "europe", name: "أوروبا", scene: "domes", blurb: "مدن تاريخية وطبيعة خضراء", open: false },
+      { id: "europe", name: "أوروبا", scene: "prague", blurb: "مدن تاريخية وقلاع وطبيعة خضراء", open: true },
       { id: "africa", name: "أفريقيا", scene: "dunes", blurb: "سفاري وصحاري وشواطئ", open: false },
       { id: "namerica", name: "أمريكا الشمالية", scene: "hcmc", blurb: "مدن عملاقة وحدائق وطنية", open: false },
       { id: "samerica", name: "أمريكا الجنوبية", scene: "terraces", blurb: "الأمازون والأنديز", open: false },
       { id: "oceania", name: "أوقيانوسيا", scene: "phuquoc", blurb: "أستراليا ونيوزيلندا والجزر", open: false },
+    ],
+
+    // دول أوروبا: نبدأ بالتشيك، والباقي قريبًا
+    europe: [
+      { id: "czechia", name: "التشيك", flag: "🇨🇿" },
+      { id: "bosnia", name: "البوسنة والهرسك", flag: "🇧🇦" },
+      { id: "albania", name: "ألبانيا", flag: "🇦🇱" },
+      { id: "montenegro", name: "الجبل الأسود", flag: "🇲🇪" },
+      { id: "austria", name: "النمسا", flag: "🇦🇹" },
+      { id: "hungary", name: "المجر", flag: "🇭🇺" },
+      { id: "poland", name: "بولندا", flag: "🇵🇱" },
+      { id: "switzerland", name: "سويسرا", flag: "🇨🇭" },
     ],
 
     // دول آسيا غير العربية. ready: فيها محتوى كامل

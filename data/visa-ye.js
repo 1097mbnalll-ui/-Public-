@@ -80,4 +80,8 @@ Object.assign(window.VISA_YE, {
     ye: ["تحتاج تأشيرة من السفارة اليابانية، مع برنامج الرحلة والحجوزات.", "A visa from the Japanese embassy, with your itinerary and bookings."],
     res: ["قدّم في السفارة اليابانية في الرياض أو القنصلية في جدة مع الإقامة.", "Apply at the Japanese embassy in Riyadh or consulate in Jeddah with your iqama."],
   },
+  czechia: {
+    ye: ["تحتاج تأشيرة شنغن من السفارة التشيكية، مع حجوزات وتأمين سفر وكشف حساب. المواعيد تتأخر، فقدّم بدري.", "You need a Schengen visa from the Czech embassy, with bookings, travel insurance and bank statements. Appointments run late, so apply early."],
+    res: ["قدّم في مركز التأشيرات في السعودية مع صورة الإقامة السارية لمدة تغطي الرحلة.", "Apply at the visa centre in Saudi Arabia with an iqama valid for the whole trip."],
+  },
 });
