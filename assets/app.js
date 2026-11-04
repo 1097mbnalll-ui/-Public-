@@ -415,7 +415,7 @@
     const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
     const plates = W.continents.map((k, i) => `
       <${k.open ? `a href="#/${k.id}"` : "div"} class="ac-plate ${k.open ? (i ? "open" : "big") : "soon"}">
-        <span class="ac-art">${scene(k.scene, true)}</span><span class="ac-no">PLATE ${ROMAN[i]}</span>
+        <span class="ac-art">${scene(k.scene, true)}${(k.photos || []).map((w, j) => `<span class="ph ph-cover ac-slide" data-wiki="${esc(w)}" style="--kb:${(i * 3 + j) % 4}"></span>`).join("")}</span><span class="ac-no">PLATE ${ROMAN[i]}</span>
         ${k.open ? "" : `<span class="at-stamp ac-soon">${T("قريبًا", "Soon")}</span>`}
         <span class="ac-lab"><b>${esc(k.name)}</b><small>${esc(k.blurb)}</small>${k.open ? `<em>${T(`${readyIn(k.id).length} ${readyIn(k.id).length === 1 ? "دولة" : "دولة"} جاهزة ←`, `${readyIn(k.id).length} ${readyIn(k.id).length === 1 ? "country" : "countries"} ready →`)}</em>` : ""}</span>
       </${k.open ? "a" : "div"}>`).join("");
@@ -469,6 +469,27 @@
       store.set("budgetPlanSAR", { ...store.get("budgetPlanSAR", {}), ...(t.b > 0 ? { budgetSAR: t.b } : {}), days: t.d, travelers: t.t, budgetMode: t.m });
       location.hash = "#/asia";
     });
+    // صور القارات: تتبدل بتلاشي ناعم، وكل صورة تتحرك ببطء (كين برنز)
+    clearInterval(window.__acTimer);
+    if (!reduced) {
+      let tick = 0;
+      const step = () => {
+        if (!document.querySelector(".ac-grid")) return clearInterval(window.__acTimer);
+        if (document.hidden) return;
+        document.querySelectorAll(".ac-art").forEach((art, i) => {
+          const ready = [...art.querySelectorAll(".ac-slide.loaded")];
+          if (!ready.length) return;
+          const cur = ready.findIndex((x) => x.classList.contains("on"));
+          // كل لوحة تتبدل بتوقيت مختلف شوي عشان ما تتحرك كلها مع بعض
+          if (cur >= 0 && (tick + i) % 2) return;
+          ready.forEach((x) => x.classList.remove("on"));
+          ready[(cur + 1) % ready.length].classList.add("on");
+        });
+        tick++;
+      };
+      window.__acTimer = setInterval(step, 3200);
+      setTimeout(step, 600);
+    }
     const grid = document.getElementById("apGrid");
     app.querySelector(".at-chips").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-f]"); if (!b) return;

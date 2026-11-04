@@ -8,12 +8,12 @@
 
   window.WORLD = {
     continents: [
-      { id: "asia", name: "آسيا", scene: "halong", blurb: "من جزر الملايو لجبال القوقاز", open: true },
-      { id: "europe", name: "أوروبا", scene: "prague", blurb: "مدن تاريخية وقلاع وطبيعة خضراء", open: true },
-      { id: "africa", name: "أفريقيا", scene: "dunes", blurb: "سفاري وصحاري وشواطئ", open: false },
-      { id: "namerica", name: "أمريكا الشمالية", scene: "hcmc", blurb: "مدن عملاقة وحدائق وطنية", open: false },
-      { id: "samerica", name: "أمريكا الجنوبية", scene: "terraces", blurb: "الأمازون والأنديز", open: false },
-      { id: "oceania", name: "أوقيانوسيا", scene: "phuquoc", blurb: "أستراليا ونيوزيلندا والجزر", open: false },
+      { id: "asia", name: "آسيا", scene: "halong", blurb: "من جزر الملايو لجبال القوقاز", open: true, photos: ["Ha Long Bay", "Mount Fuji", "Registan"] },
+      { id: "europe", name: "أوروبا", scene: "prague", blurb: "مدن تاريخية وقلاع وطبيعة خضراء", open: true, photos: ["Charles Bridge", "Hallstatt", "Matterhorn"] },
+      { id: "africa", name: "أفريقيا", scene: "dunes", blurb: "سفاري وصحاري وشواطئ", open: false, photos: ["Victoria Falls", "Serengeti National Park", "Table Mountain"] },
+      { id: "namerica", name: "أمريكا الشمالية", scene: "hcmc", blurb: "مدن عملاقة وحدائق وطنية", open: false, photos: ["Grand Canyon", "Moraine Lake", "Statue of Liberty"] },
+      { id: "samerica", name: "أمريكا الجنوبية", scene: "terraces", blurb: "الأمازون والأنديز", open: false, photos: ["Machu Picchu", "Iguazu Falls", "Torres del Paine National Park"] },
+      { id: "oceania", name: "أوقيانوسيا", scene: "phuquoc", blurb: "أستراليا ونيوزيلندا والجزر", open: false, photos: ["Sydney Opera House", "Milford Sound", "Great Barrier Reef"] },
     ],
 
     // دول أوروبا: نبدأ بالتشيك، والباقي قريبًا

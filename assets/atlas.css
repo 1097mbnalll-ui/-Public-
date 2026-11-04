@@ -468,3 +468,21 @@ body.page-city .currency button.on, body.page-plan .currency button.on { backgro
   .ac-plate:not(.big) .ac-lab small { display: none; }
   .ac-grid > .ac-plate:last-child:nth-child(even) { height: 120px; }
 }
+
+/* ===== صور القارات الحقيقية مع حركة ===== */
+.ac-art { overflow: hidden; }
+.ac-slide { opacity: 0; transition: opacity 1.6s ease; z-index: 1; }
+.ac-slide img { opacity: 1 !important; transform: none; transform-origin: var(--ox, 50%) var(--oy, 50%); }
+.ac-slide.on { opacity: 1; z-index: 2; }
+.ac-slide.on img { animation: acKB 9s ease-out both; }
+.ac-slide[style*="--kb:0"] { --ox: 30%; --oy: 40%; } .ac-slide[style*="--kb:1"] { --ox: 70%; --oy: 35%; }
+.ac-slide[style*="--kb:2"] { --ox: 50%; --oy: 70%; } .ac-slide[style*="--kb:3"] { --ox: 20%; --oy: 60%; }
+@keyframes acKB { from { transform: scale(1.02); } to { transform: scale(1.16); } }
+.ac-plate .ac-lab { z-index: 3; } .ac-plate .ac-no, .ac-plate .ac-soon { z-index: 3; }
+.ac-plate.soon .ac-slide img { filter: sepia(.35) saturate(.8) brightness(.92); }
+.ac-plate.soon .ac-art { filter: none; }
+.ac-plate:hover .ac-slide.on img { animation-duration: 6s; }
+@media (prefers-reduced-motion: reduce) {
+  .ac-slide.on img { animation: none; }
+  .ac-slide:first-of-type.loaded { opacity: 1; }
+}
